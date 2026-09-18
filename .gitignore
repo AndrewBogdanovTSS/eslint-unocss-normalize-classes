@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+*.tgz
+
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store

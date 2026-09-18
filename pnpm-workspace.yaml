@@ -1,0 +1,5 @@
+# pnpm asks, once, whether a dependency's install script may run. esbuild's
+# links the platform binary its optional dependency already provides, and the
+# suite passes without it - so it stays off.
+allowBuilds:
+  esbuild: false

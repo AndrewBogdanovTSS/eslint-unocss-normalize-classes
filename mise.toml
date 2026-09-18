@@ -1,0 +1,14 @@
+# What this file is for: making the toolchain exist on a machine that does not
+# have it. It is not where the pnpm version is decided.
+#
+# mise does not read `packageManager`, and pnpm 10+ does - it self-manages and
+# switches to the version named there, so `packageManager` wins at runtime no
+# matter what is pinned here. CI does not use this file at all;
+# `pnpm/action-setup` reads `packageManager` too.
+#
+# So the major is pinned here as a bootstrap, and package.json stays the single
+# exact source of truth. Two exact versions would only be two things to keep in
+# sync, and the one below would lose.
+[tools]
+node = "24.14.1"
+pnpm = "12"

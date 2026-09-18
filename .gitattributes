@@ -1,0 +1,4 @@
+# The prover compares generated CSS as text, and the fixture configs are read
+# byte for byte by the integration suite. A checkout that rewrote line endings
+# would change a comparison without changing a line of code.
+* text=auto eol=lf

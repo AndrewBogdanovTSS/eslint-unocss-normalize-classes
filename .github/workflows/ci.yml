@@ -1,0 +1,86 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Built once, here, and handed to every other job.
+  #
+  # Two reasons, and the second is the load-bearing one. The suite needs
+  # `dist/worker.mjs` on disk even when it imports `src/`, because the rule
+  # loads its worker by path in development too. And tsdown's own floor is
+  # `^24.11.0`, which is higher than this package's `>=24` - building on every
+  # matrix leg would test the toolchain's range instead of the package's, and
+  # would fail on the very version the floor claim is about.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          # The builder is 24, not the newest in the matrix below. It is the
+          # version this package is developed and released on, so the artifact
+          # every other job downloads is produced by a toolchain that has
+          # actually been run, rather than by the newest one available.
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # The full suite, on the Node versions `engines.node` claims to support.
+  # `24.0.0` is pinned rather than `24`, because `>=24` is a claim about the
+  # oldest 24 and testing only the newest would leave it unchecked. It can only
+  # run here because the build already happened: eslint and vitest both accept
+  # 24.0.0, tsdown does not.
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24.0.0', '24', '26']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      # `test:unit` rather than `test`, which would rebuild - this job exists to
+      # run the suite against the artifact the build job produced.
+      - run: pnpm test:unit
+
+  # The built plugin through a real ESLint, and the README against the package.
+  # Neither depends on the Node version, so running them across the matrix
+  # would say nothing new.
+  verify:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - run: pnpm smoke
+      - run: pnpm check:docs

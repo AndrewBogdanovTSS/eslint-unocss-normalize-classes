@@ -1,0 +1,83 @@
+{
+  "name": "eslint-plugin-unocss-normalize-classes",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Normalizes UnoCSS class attributes from your own uno.config - and proves every rewrite generates identical CSS before it applies one.",
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "unocss",
+    "atomic-css",
+    "vue",
+    "autofix",
+    "codemod",
+    "shortcuts",
+    "blocklist"
+  ],
+  "license": "MIT",
+  "author": "Andrii Bohdanov",
+  "homepage": "https://github.com/AndrewBogdanovTSS/eslint-unocss-normalize-classes#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndrewBogdanovTSS/eslint-unocss-normalize-classes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AndrewBogdanovTSS/eslint-unocss-normalize-classes/issues"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.4.1",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./worker": "./dist/worker.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test": "pnpm run build && vitest run",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "check:docs": "tsx scripts/check-docs.ts",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "prepublishOnly": "pnpm run build",
+    "release": "tsx scripts/release.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "peerDependencies": {
+    "eslint": ">=9"
+  },
+  "dependencies": {
+    "@unocss/config": "^66.10.5",
+    "@unocss/core": "^66.10.5",
+    "synckit": "^0.11.13"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/core": "^0.18.5",
+    "@types/node": "^26.6.1",
+    "eslint": "^10.10.0",
+    "publint": "^0.3.24",
+    "tsdown": "^0.23.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "unocss": "^66.10.5",
+    "vitest": "^5.0.0",
+    "vue-eslint-parser": "^10.4.1"
+  }
+}
