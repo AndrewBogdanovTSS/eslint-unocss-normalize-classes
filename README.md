@@ -157,6 +157,41 @@ reading for a project whose users change their browser font size.
 your config, not noise: it means an entry claims a replacement that renders
 differently. That is the `blur-[4px]` case, and you want to hear about it.
 
+## Alongside `unocss/order`
+
+They compose, and they are better together than either is alone. The sorter
+decides the order of the tokens; this rule decides which tokens they are.
+
+```js
+rules: {
+  'unocss/order': 'error',
+  'unocss-normalize/classes': 'error',
+}
+```
+
+**This rule unblocks the sorter.** `unocss/order` sorts by asking the generator
+to parse each token, and a token your blocklist blocks does not parse - so the
+sorter leaves it exactly where it is. On a file written in the spellings your
+config rejects, sorting does almost nothing:
+
+```
+class="opacity-50 border flex"
+
+  unocss/order alone            opacity-50 border flex   nothing it can sort
+  this rule alone               op-50 b flex             normalised, order untouched
+  both, in one ESLint run       flex b op-50
+```
+
+Configure them in the same run rather than one after the other. ESLint re-runs
+every rule after each fix pass, so the pair converges; a whole run of one piped
+into a whole run of the other does not, because the sorter has already had its
+turn before the tokens became sortable.
+
+One caveat worth knowing: `unocss/order` rewrites a class attribute onto a
+single line, including when the tokens are already in order. With it enabled, a
+multi-line class list will be flattened - by the sorter, not by this rule. The
+suite pins that behaviour, so if upstream changes it this note goes.
+
 ## What it does not do
 
 - **Dynamic `:class` expressions.** A binding is JavaScript, and the class list
@@ -188,6 +223,23 @@ knows nothing about UnoCSS, ESLint, or where the answers came from - useful for
 a one-off codemod, and the reason it could be lifted into
 `@unocss/eslint-plugin` whose own `blocklist` rule already declares
 `fixable: 'code'` and never emits a fix.
+
+## Try it without installing it
+
+`demo/` is a minimal Nuxt 4 app wired to the working copy of this package:
+
+```bash
+pnpm demo:install
+pnpm demo:lint
+```
+
+Two cards with the same design, one written in the spellings the demo's
+blocklist rejects. `pnpm --dir demo lint:fix` rewrites it and the page renders
+identically - except for one deliberately wrong fix, which the plugin reports
+instead of applying. See [demo/README.md](demo/README.md).
+
+The demo is its own workspace root, so it never enters this package's install
+or its CI.
 
 ## Development
 

@@ -9,36 +9,12 @@
  * What it checks that `session.test.ts` cannot: which attributes the rule looks
  * at, what it writes back into the source text, and what it reports.
  */
-import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { RuleTester } from 'eslint'
 import * as vueParser from 'vue-eslint-parser'
 import { describe, it } from 'vitest'
 import rule from '../src/rule'
-
-/**
- * The rule loads its worker from `dist/`, while every other suite imports
- * `src/`. Running this one against a stale build tests code that is no longer
- * in the repository and reports it as a pass - which happened once already,
- * and is exactly the kind of unbacked pass this package exists to prevent.
- */
-function assertWorkerIsCurrent(): void {
-  const worker = fileURLToPath(new URL('../dist/worker.mjs', import.meta.url))
-  const source = fileURLToPath(new URL('../src', import.meta.url))
-
-  const builtAt = statSync(worker).mtimeMs
-  const newestSource = readdirSync(source, { recursive: true, encoding: 'utf8' })
-    .filter((entry) => entry.endsWith('.ts'))
-    .map((entry) => statSync(`${source}/${entry}`).mtimeMs)
-    .reduce((newest, at) => Math.max(newest, at), 0)
-
-  if (newestSource > builtAt) {
-    throw new Error(
-      'dist/worker.mjs is older than src/. This suite would have tested the '
-      + 'previous build - run `pnpm build`, or `pnpm test`, which builds first.',
-    )
-  }
-}
+import { assertWorkerIsCurrent } from './helpers/worker-is-current'
 
 assertWorkerIsCurrent()
 

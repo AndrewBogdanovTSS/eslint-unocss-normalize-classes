@@ -1,0 +1,8 @@
+# The demo is its own workspace root, so `pnpm install` here installs the demo
+# and not the package above it - and the package's own install never drags a
+# Nuxt app into node_modules or CI.
+#
+# esbuild's install script only links a platform binary its optional dependency
+# already provides, and the demo runs without it.
+allowBuilds:
+  esbuild: false

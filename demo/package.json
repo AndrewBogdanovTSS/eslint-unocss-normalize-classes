@@ -1,0 +1,24 @@
+{
+  "name": "unocss-normalize-classes-demo",
+  "private": true,
+  "type": "module",
+  "description": "A Nuxt 4 app for trying eslint-plugin-unocss-normalize-classes without installing it anywhere.",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@unocss/eslint-config": "^66.10.5",
+    "@unocss/nuxt": "^66.10.5",
+    "eslint": "^10.10.0",
+    "eslint-plugin-unocss-normalize-classes": "link:..",
+    "unocss": "^66.10.5",
+    "vue-eslint-parser": "^10.4.1"
+  }
+}

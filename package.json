@@ -51,6 +51,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.mjs",
+    "demo:install": "pnpm --dir demo install",
+    "demo:lint": "pnpm --dir demo lint",
+    "demo:dev": "pnpm --dir demo dev",
     "check:docs": "tsx scripts/check-docs.ts",
     "hooks:install": "git config core.hooksPath .githooks",
     "prepublishOnly": "pnpm run build",
@@ -71,6 +74,7 @@
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
     "@types/node": "^26.6.1",
+    "@unocss/eslint-config": "^66.10.5",
     "eslint": "^10.10.0",
     "publint": "^0.3.24",
     "tsdown": "^0.23.0",

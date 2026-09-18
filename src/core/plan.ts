@@ -118,17 +118,36 @@ async function collapseShortcuts(
   deps: PlanDeps,
   unproven: UnprovenRewrite[],
 ): Promise<string[]> {
+  const maxPasses = deps.maxPasses ?? DEFAULT_MAX_PASSES
   let current = tokens
 
-  for (const shortcut of deps.shortcuts) {
-    if (current.includes(shortcut.name)) continue
+  // Repeated until nothing moves, because shortcuts are routinely defined in
+  // terms of each other: `card` is `f-col gap-4 p-6`, and `f-col` only appears
+  // once `flex flex-col` has been collapsed. A single pass over the list would
+  // check `card` while its first token was still two tokens, find no match,
+  // and never look again.
+  for (let pass = 0; pass < maxPasses; pass++) {
+    let changed = false
 
-    const match = matchShortcut(current, shortcut)
-    if (!match) continue
+    for (const shortcut of deps.shortcuts) {
+      if (current.includes(shortcut.name)) continue
 
-    const matched = match.indexes.map((index) => current[index]).join(' ')
-    if (await deps.prove(matched, shortcut.name)) current = applyShortcut(current, match)
-    else unproven.push({ before: matched, after: shortcut.name, source: 'shortcut' })
+      const match = matchShortcut(current, shortcut)
+      if (!match) continue
+
+      const matched = match.indexes.map((index) => current[index]).join(' ')
+      if (await deps.prove(matched, shortcut.name)) {
+        current = applyShortcut(current, match)
+        changed = true
+      } else {
+        // Recorded once. A refusal that cannot be applied cannot change the
+        // list either, so a later pass would only repeat it.
+        const seen = unproven.some((entry) => entry.before === matched && entry.after === shortcut.name)
+        if (!seen) unproven.push({ before: matched, after: shortcut.name, source: 'shortcut' })
+      }
+    }
+
+    if (!changed) break
   }
 
   return current

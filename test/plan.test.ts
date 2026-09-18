@@ -133,3 +133,33 @@ describe('planRewrite', () => {
     expect(plan.unproven.map((entry) => entry.source)).toEqual(['blocklist', 'shortcut'])
   })
 })
+
+describe('shortcuts defined in terms of other shortcuts', () => {
+  const nested = [
+    // Longest first, the order `collapsibleShortcuts` produces.
+    { name: 'card', tokens: ['f-col', 'gap-4', 'p-6'] },
+    { name: 'f-col', tokens: ['flex', 'flex-col'] },
+  ]
+
+  it('collapses the inner shortcut and then the outer one', async () => {
+    const plan = await planRewrite('flex flex-col gap-4 p-6', deps({ shortcuts: nested }))
+    expect(plan.value).toBe('card')
+  })
+
+  it('stops at the inner one when the outer cannot be proved', async () => {
+    const plan = await planRewrite('flex flex-col gap-4 p-6', deps({
+      shortcuts: nested,
+      prove: async (_before, after) => after !== 'card',
+    }))
+    expect(plan.value).toBe('f-col gap-4 p-6')
+    expect(plan.unproven).toEqual([{ before: 'f-col gap-4 p-6', after: 'card', source: 'shortcut' }])
+  })
+
+  it('reports a refusal once however many passes look at it', async () => {
+    const plan = await planRewrite('flex flex-col gap-4 p-6 extra', deps({
+      shortcuts: nested,
+      prove: async (_before, after) => after !== 'card',
+    }))
+    expect(plan.unproven.filter((entry) => entry.after === 'card')).toHaveLength(1)
+  })
+})
