@@ -26,6 +26,7 @@ const syncPlan = createSyncFn<(...request: PlanRequest) => Promise<PlanResult>>(
 interface RuleOptions {
   shortcuts?: boolean
   blocklist?: boolean
+  variantGroups?: boolean | { minimum: number }
   reportUnproven?: boolean
   rootFontSize?: number | false
   configPath?: string
@@ -34,6 +35,11 @@ interface RuleOptions {
 const DEFAULTS: Required<Omit<RuleOptions, 'configPath'>> = {
   shortcuts: true,
   blocklist: true,
+  // Off by default: the grouped syntax only works when the build runs
+  // `transformerVariantGroup`, and this rule cannot see a transformer that a
+  // framework module registers outside `uno.config.ts` - which is how a Nuxt
+  // project usually registers it.
+  variantGroups: false,
   reportUnproven: true,
   rootFontSize: 16,
 }
@@ -67,6 +73,16 @@ const rule: Rule.RuleModule = {
       properties: {
         shortcuts: { type: 'boolean' },
         blocklist: { type: 'boolean' },
+        variantGroups: {
+          anyOf: [
+            { type: 'boolean' },
+            {
+              type: 'object',
+              properties: { minimum: { type: 'integer', minimum: 2 } },
+              additionalProperties: false,
+            },
+          ],
+        },
         reportUnproven: { type: 'boolean' },
         // ESLint validates rule schemas against JSON Schema draft-04, where
         // `exclusiveMinimum` is a boolean modifier on `minimum` rather than a
@@ -97,10 +113,15 @@ const rule: Rule.RuleModule = {
     const settings = context.settings as { unocss?: { configPath?: string } }
     const configPath = options.configPath ?? settings.unocss?.configPath
 
+    // `true` is the shorthand for the ordinary case: group a prefix as soon as
+    // two tokens share it.
+    const variantGroups = options.variantGroups === true ? { minimum: 2 } : options.variantGroups
+
     const planOptions: PlanOptions = {
       shortcuts: options.shortcuts,
       blocklist: options.blocklist,
       rootFontSize: options.rootFontSize,
+      variantGroups,
     }
 
     const sourceCode = context.sourceCode

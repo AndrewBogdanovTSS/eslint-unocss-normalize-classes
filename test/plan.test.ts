@@ -163,3 +163,53 @@ describe('shortcuts defined in terms of other shortcuts', () => {
     expect(plan.unproven.filter((entry) => entry.after === 'card')).toHaveLength(1)
   })
 })
+
+describe('collapsing tokens that share a variant', () => {
+  const grouping = { minimum: 2 }
+
+  it('is off unless the project asks for it', async () => {
+    const plan = await planRewrite('md:text-center md:mx-a', deps())
+    expect(plan.changed).toBe(false)
+  })
+
+  it('groups tokens that share a prefix', async () => {
+    const plan = await planRewrite('md:text-center md:mx-a', deps({ variantGroups: grouping }))
+    expect(plan.value).toBe('md:(text-center mx-a)')
+  })
+
+  it('leaves tokens without a shared prefix where they are', async () => {
+    const plan = await planRewrite('md:text-center flex md:mx-a p-4', deps({ variantGroups: grouping }))
+    expect(plan.value).toBe('md:(text-center mx-a) flex p-4')
+  })
+
+  it('does not group a prefix carried by only one token', async () => {
+    const plan = await planRewrite('md:text-center hover:flex', deps({ variantGroups: grouping }))
+    expect(plan.changed).toBe(false)
+  })
+
+  it('treats stacked variants as one prefix, and different stacks as different', async () => {
+    const plan = await planRewrite('md:hover:a md:hover:b md:c', deps({ variantGroups: grouping }))
+    expect(plan.value).toBe('md:hover:(a b) md:c')
+  })
+
+  it('honours a higher minimum', async () => {
+    const two = await planRewrite('md:a md:b', deps({ variantGroups: { minimum: 3 } }))
+    expect(two.changed).toBe(false)
+
+    const three = await planRewrite('md:a md:b md:c', deps({ variantGroups: { minimum: 3 } }))
+    expect(three.value).toBe('md:(a b c)')
+  })
+
+  it('groups what a blocklist fix just produced', async () => {
+    const plan = await planRewrite('md:text-center md:mx-auto', deps({
+      variantGroups: grouping,
+      declaredFix: async (token) => (token === 'md:mx-auto' ? ['md:mx-a'] : null),
+    }))
+    expect(plan.value).toBe('md:(text-center mx-a)')
+  })
+
+  it('keeps a group the author already wrote, even below the minimum', async () => {
+    const plan = await planRewrite('md:(text-center)', deps({ variantGroups: { minimum: 5 } }))
+    expect(plan.value).toBe('md:(text-center)')
+  })
+})

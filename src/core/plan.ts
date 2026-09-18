@@ -15,7 +15,7 @@
 import { collapseVariantGroup, parseVariantGroup } from '@unocss/core'
 import { applyShortcut, matchShortcut } from './shortcuts'
 import type { ShortcutSet } from './shortcuts'
-import { splitClassValue } from './tokens'
+import { splitClassValue, splitToken } from './tokens'
 
 export interface UnprovenRewrite {
   /** What the source said. */
@@ -47,6 +47,16 @@ export interface PlanDeps {
   prove: (before: string, after: string) => Promise<boolean>
   /** Collapsible shortcuts, longest first. */
   shortcuts: readonly ShortcutSet[]
+  /**
+   * Collapse tokens that share a variant into a group -
+   * `md:text-center md:mx-a` into `md:(text-center mx-a)`.
+   *
+   * Off unless asked for, because the syntax only works when the build runs
+   * `transformerVariantGroup`. The generator does not understand a group on its
+   * own: `uno.generate('md:(a b)')` matches nothing. A project without that
+   * transformer would end up with class names that produce no CSS at all.
+   */
+  variantGroups?: false | { minimum: number }
   /**
    * How many times a token may be rewritten in a row. A blocklist can chain -
    * `ma-auto` to `m-auto` to `m-a` - and two entries can also disagree in a
@@ -154,6 +164,33 @@ async function collapseShortcuts(
 }
 
 /**
+ * The variant prefixes worth collapsing into a group.
+ *
+ * A prefix qualifies when enough tokens share it exactly - `md:text-center` and
+ * `md:mx-a` share `md:`, while `md:text-center` and `md:hover:mx-a` do not,
+ * because collapsing those would need a nested group and the flat one would be
+ * wrong. Tokens that already carry a bracket are left out: they are either a
+ * group already or an arbitrary value, and neither is ours to rearrange.
+ *
+ * @param tokens - The class list, after the other sources have run.
+ * @param minimum - How many tokens must share a prefix before it is grouped.
+ * @returns The prefixes to hand to `collapseVariantGroup`.
+ */
+export function groupablePrefixes(tokens: readonly string[], minimum: number): string[] {
+  const counts = new Map<string, number>()
+
+  for (const token of tokens) {
+    if (token.includes('(') || token.includes(')')) continue
+    const { prefix } = splitToken(token)
+    if (prefix) counts.set(prefix, (counts.get(prefix) ?? 0) + 1)
+  }
+
+  return [...counts.entries()]
+    .filter(([, count]) => count >= minimum)
+    .map(([prefix]) => prefix)
+}
+
+/**
  * Plan the normalization of one static class attribute.
  *
  * Variant groups are expanded before the rewrite and collapsed after it, using
@@ -181,11 +218,16 @@ export async function planRewrite(value: string, deps: PlanDeps): Promise<PlanRe
 
   const collapsed = await collapseShortcuts(normalized, deps, unproven)
 
-  const prefixes = [...group.prefixes]
+  // The prefixes the author already grouped are always put back. New ones are
+  // added only when the project asked for grouping.
+  const prefixes = new Set(group.prefixes)
+  if (deps.variantGroups) {
+    for (const prefix of groupablePrefixes(collapsed, deps.variantGroups.minimum)) prefixes.add(prefix)
+  }
   // Variant-group collapsing works on a space-joined list, so the author's
   // separator is applied afterwards rather than fought with.
-  const rewritten = prefixes.length
-    ? collapseVariantGroup(collapsed.join(' '), prefixes).split(/\s+/).filter(Boolean)
+  const rewritten = prefixes.size
+    ? collapseVariantGroup(collapsed.join(' '), [...prefixes]).split(/\s+/).filter(Boolean)
     : collapsed
   const joined = rewritten.join(separator)
 

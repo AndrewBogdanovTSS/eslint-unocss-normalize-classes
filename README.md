@@ -117,6 +117,34 @@ groups are expanded before the rewrite and collapsed after it, using the same
 UnoCSS helpers the `unocss/order` rule uses, so `hover:(border opacity-50)`
 comes back as `hover:(b op-50)`.
 
+### Variant groups
+
+Tokens that share a variant can be collapsed into a group:
+
+```diff
+- <div class="md:text-center md:mx-a" />
++ <div class="md:(text-center mx-a)" />
+```
+
+**Off by default, and it needs one thing from your build:**
+`transformerVariantGroup`. The generator does not understand a group on its own -
+`uno.generate('md:(a b)')` matches nothing - so in a project without that
+transformer the grouped class names would produce no CSS at all.
+
+```js
+'unocss-normalize/classes': ['error', { variantGroups: true }],
+```
+
+`true` groups a prefix as soon as two tokens share it; `{ minimum: 3 }` waits
+for three. Only exact prefixes are grouped - `md:a` and `md:hover:b` do not
+share one, and flattening them together would be wrong. A group the author
+already wrote is kept whatever the minimum.
+
+This is not detected automatically, on purpose. A Nuxt project registers its
+transformers through the module options rather than `uno.config.ts`, so the
+config this rule loads can report no transformers in a project whose build runs
+them - auto-detection would refuse to group in exactly the projects that can.
+
 ## How a rewrite is proved
 
 A second generator is built from the same config with the blocklist, safelist
@@ -149,6 +177,7 @@ reading for a project whose users change their browser font size.
 | ---------------- | ------- | -------------------------------------------------------------------------------- |
 | `shortcuts`      | `true`  | Collapse token sets that a shortcut already names                                  |
 | `blocklist`      | `true`  | Apply the `fix` a blocklist entry declares                                         |
+| `variantGroups`  | `false` | Collapse tokens sharing a variant into a group; `true`, or `{ minimum: n }`        |
 | `reportUnproven` | `true`  | Report a rewrite that was proposed and refused, instead of staying silent          |
 | `rootFontSize`   | `16`    | Root size for comparing `rem` against `px`; `false` compares them strictly         |
 | `configPath`     | -       | Path to the UnoCSS config, when it is not where UnoCSS would look                  |

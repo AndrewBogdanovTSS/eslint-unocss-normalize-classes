@@ -20,7 +20,7 @@ const basic = fileURLToPath(new URL('./fixtures/basic/uno.config.ts', import.met
 const noFixes = fileURLToPath(new URL('./fixtures/no-fixes/uno.config.ts', import.meta.url))
 const looping = fileURLToPath(new URL('./fixtures/looping/uno.config.ts', import.meta.url))
 
-const DEFAULTS: PlanOptions = { shortcuts: true, blocklist: true, rootFontSize: 16 }
+const DEFAULTS: PlanOptions = { shortcuts: true, blocklist: true, rootFontSize: 16, variantGroups: false }
 
 const plan = async (value: string, options: Partial<PlanOptions> = {}, config = basic) =>
   planForConfig(config, value, undefined, { ...DEFAULTS, ...options })

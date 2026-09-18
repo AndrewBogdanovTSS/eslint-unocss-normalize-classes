@@ -29,6 +29,10 @@
       <h2 class="text-lg font-semibold">Messy</h2>
     </header>
 
+    <p class="md:text-center md:opacity-50">
+      Two tokens sharing a breakpoint, waiting to be grouped.
+    </p>
+
     <p class="opacity-50">
       Written in spellings the blocklist rejects, so none of it reaches the stylesheet.
     </p>

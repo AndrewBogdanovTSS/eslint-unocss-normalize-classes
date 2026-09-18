@@ -127,6 +127,21 @@ ruleTester.run('unocss-normalize/classes', rule, {
       code: '<template><div class="border" /></template>',
       options: [{ configPath: noFixesConfigPath }],
     },
+    {
+      name: 'tokens sharing a variant, when grouping was not asked for',
+      code: '<template><div class="md:b md:op-50" /></template>',
+      options,
+    },
+    {
+      name: 'a lone token carrying a variant, with grouping on',
+      code: '<template><div class="md:b flex" /></template>',
+      options: [{ configPath, variantGroups: true }],
+    },
+    {
+      name: 'a pair below the configured minimum',
+      code: '<template><div class="md:b md:op-50" /></template>',
+      options: [{ configPath, variantGroups: { minimum: 3 } }],
+    },
   ],
 
   invalid: [
@@ -262,6 +277,29 @@ ruleTester.run('unocss-normalize/classes', rule, {
       output: null,
       options,
       errors: [{ messageId: 'unproven' }, { messageId: 'unproven' }],
+    },
+
+    // --- variant groups ---
+    {
+      name: 'tokens sharing a variant are grouped when the project asks',
+      code: '<template><div class="md:flex md:gap-2" /></template>',
+      output: '<template><div class="md:(flex gap-2)" /></template>',
+      options: [{ configPath, variantGroups: true }],
+      errors: [{ messageId: 'normalize' }],
+    },
+    {
+      name: 'grouping runs after the blocklist fixes that produced the tokens',
+      code: '<template><div class="md:border md:opacity-50 flex" /></template>',
+      output: '<template><div class="md:(b op-50) flex" /></template>',
+      options: [{ configPath, variantGroups: true }],
+      errors: [{ messageId: 'normalize' }],
+    },
+    {
+      name: 'a higher minimum groups a triple',
+      code: '<template><div class="md:border md:opacity-50 md:flex" /></template>',
+      output: '<template><div class="md:(b op-50 flex)" /></template>',
+      options: [{ configPath, variantGroups: { minimum: 3 } }],
+      errors: [{ messageId: 'normalize' }],
     },
 
     // --- configuration ---

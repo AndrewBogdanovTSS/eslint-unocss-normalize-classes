@@ -1,4 +1,4 @@
-import { defineConfig, presetWind3 } from 'unocss'
+import { defineConfig, presetWind3, transformerVariantGroup } from 'unocss'
 
 /**
  * A small, ordinary project config.
@@ -10,6 +10,11 @@ import { defineConfig, presetWind3 } from 'unocss'
  */
 export default defineConfig({
   presets: [presetWind3()],
+
+  // What makes `md:(text-center mx-a)` mean anything: the generator does not
+  // understand a group, this transformer expands it before generation. The
+  // ESLint rule's `variantGroups` option is only safe because this is here.
+  transformers: [transformerVariantGroup()],
 
   shortcuts: {
     center: 'items-center justify-center',

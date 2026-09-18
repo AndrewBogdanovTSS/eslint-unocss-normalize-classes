@@ -29,6 +29,17 @@ export interface PlanOptions {
   blocklist: boolean
   /** Root font size for comparing `rem` against `px`, or `false` to compare strictly. */
   rootFontSize: number | false
+  /**
+   * Collapse tokens sharing a variant into a group, once this many share it.
+   * `false` leaves them alone.
+   *
+   * Not detected automatically, and deliberately so: a Nuxt project passes its
+   * transformers through the module options rather than `uno.config.ts`, so the
+   * config this worker loads can be missing `transformerVariantGroup` in a
+   * project whose build runs it. Guessing from what is visible here would
+   * refuse to group in exactly the projects that can.
+   */
+  variantGroups: false | { minimum: number }
 }
 
 /** A blocklist entry that declares how to rewrite what it blocks. */
@@ -162,6 +173,7 @@ async function plan(
 
   return planRewrite(value, {
     shortcuts: options.shortcuts ? session.shortcuts : [],
+    variantGroups: options.variantGroups,
     declaredFix: async (token) => {
       if (!options.blocklist) return null
       const key = cacheKey(scope, token)

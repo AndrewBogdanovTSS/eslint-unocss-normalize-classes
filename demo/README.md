@@ -56,6 +56,17 @@ Worth watching in the diff:
 + class="card"
 ```
 
+And the breakpoint pair, collapsed into a group after its own fix landed:
+
+```diff
+- class="md:text-center md:opacity-50"
++ class="md:(text-center op-50)"
+```
+
+That one needs `transformerVariantGroup` in the build - it is in
+`uno.config.ts` here, which is why `variantGroups: true` is safe to turn on in
+`eslint.config.js`.
+
 Three steps, each proved on its own: `border` becomes `b` from the blocklist,
 `flex flex-col` collapses into the `f-col` shortcut, and the result then matches
 `card`, which is defined in terms of `f-col`.

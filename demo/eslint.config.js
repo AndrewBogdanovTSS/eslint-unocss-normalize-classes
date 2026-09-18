@@ -20,7 +20,9 @@ export default [
       // The sorter decides the order of the tokens; the normaliser decides
       // which tokens they are. Both in one run - see the README.
       'unocss/order': 'error',
-      'unocss-normalize/classes': 'error',
+      // `variantGroups` is on because this demo's build runs
+      // `transformerVariantGroup` - see uno.config.ts.
+      'unocss-normalize/classes': ['error', { variantGroups: true }],
     },
   },
 ]
