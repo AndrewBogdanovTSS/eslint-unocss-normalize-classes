@@ -9,7 +9,7 @@
       </p>
     </header>
 
-    <div class="grid cols-1 gap-6">
+    <div class="grid cols-1 gap-6 md:cols-2">
       <MessyCard />
       <TidyCard />
     </div>

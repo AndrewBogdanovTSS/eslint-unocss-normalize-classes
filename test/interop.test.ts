@@ -19,6 +19,7 @@ import { ESLint } from 'eslint'
 import type { Linter } from 'eslint'
 import * as vueParser from 'vue-eslint-parser'
 import { describe, expect, it } from 'vitest'
+import { isEquivalent } from '../src/core/equivalence'
 import rule from '../src/rule'
 import { assertWorkerIsCurrent } from './helpers/worker-is-current'
 
@@ -233,5 +234,45 @@ describe('variant grouping beside the sorter', () => {
     // reporting an order it can never reach. (`c-brand` still draws a refusal
     // from the fixture's deliberately wrong fix - a different claim.)
     expect(messages.filter((message) => message.ruleId === 'unocss/order')).toEqual([])
+  })
+})
+
+describe('the attribute still renders the same after both rules', () => {
+  // The end-to-end version of the package's promise. Each rewrite is proved on
+  // its own inside the rule; this checks the whole attribute after the sorter
+  // has also had its turn - which is where a dropped token would show up, and
+  // where it would otherwise look like a tidy-up in the diff.
+  const prover = (async () => {
+    const { loadConfig } = await import('@unocss/config')
+    const { createGenerator, parseVariantGroup } = await import('@unocss/core')
+    const { config } = await loadConfig(fileURLToPath(new URL('./fixtures/basic', import.meta.url)))
+    const uno = await createGenerator({ ...config, warn: false, blocklist: [], safelist: [], preflights: [] })
+
+    return async (classes: string) => {
+      // The generator does not understand a variant group; the transformer is
+      // what expands one at build time, so expand before asking.
+      const expanded = parseVariantGroup(classes).expanded
+      const { css } = await uno.generate(expanded, { preflights: false, minify: true })
+      return css
+    }
+  })()
+
+  const classesOf = (source: string) => /class="([^"]*)"/.exec(source)?.[1] ?? ''
+
+  it.each([
+    'lg:hover:(text-red-30 cols-2) grid cols-1 gap-6',
+    'md:border md:opacity-50 flex',
+    'border blur-[4px] text-center',
+    'hover:(border opacity-50) size-4',
+    'flex justify-center gap-2 items-center',
+  ])('generates the same CSS before and after: %s', async (classes) => {
+    const generate = await prover
+    const code = `<template><div class="${classes}" /></template>`
+    const { output } = await fixUntilStable(code, {
+      'unocss-normalize/classes': ['error', { configPath, variantGroups: true }],
+      'unocss/order': 'error',
+    })
+
+    expect(isEquivalent(await generate(classes), await generate(classesOf(output)))).toBe(true)
   })
 })
