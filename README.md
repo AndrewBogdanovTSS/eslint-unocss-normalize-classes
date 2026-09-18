@@ -81,7 +81,9 @@ shortcuts: {
 
 Matching is order-independent, because a class attribute is a set. The
 shortcut's name takes the position of the earliest token it replaces, so
-nothing else in the attribute moves.
+nothing else in the attribute moves. When two shortcuts compete for the same
+tokens the larger one wins, and a single-token shortcut is never collapsed -
+that is a rename, not a simplification.
 
 ### Blocklist entries that declare a fix
 
@@ -124,10 +126,14 @@ comparison is "something versus nothing".
 Both sides are generated and reduced to the declarations a browser would
 compute:
 
-- selectors are dropped, so `.c-black` and `.hover\:c-black:hover` compare equal
-- declaration order is ignored
+- class names are dropped, so a rename compares equal
+- declaration order, and the order rules appear in, are ignored
 - `--un-*` custom properties are resolved the way the cascade resolves them,
   so `c-black/50` and `c-black c-op-50` are recognised as the same colour
+- **the condition travels with the declaration.** `padding: 1rem` inside
+  `@media (min-width: 640px)` is not the same promise as `padding: 1rem`
+  outside one, and `color: red` on `:hover` is not `color: red`. A fix that
+  adds or drops a variant is refused, however plausible the rename looks
 - two empty stylesheets are never equal, so rewriting one unknown token into
   another is refused rather than waved through
 
@@ -162,6 +168,12 @@ differently. That is the `blur-[4px]` case, and you want to hear about it.
 - **Replace `unocss/blocklist`.** That rule reports everything your blocklist
   blocks. This one only speaks up where it can either fix something or tell you
   a declared fix is wrong. Run both.
+- **Reformat your templates.** A rewrite is joined with the whitespace the
+  attribute already used, so a class list written one token per line stays that
+  way, and an attribute nothing could be proved about is left byte for byte.
+- **Deduplicate.** `border border` becomes `b b`. Removing a repeat is a
+  different change from normalising one, and doing it here would mean editing
+  attributes nobody asked about.
 
 ## Using the parts directly
 

@@ -78,15 +78,53 @@ export function joinToken(parts: SplitToken, body: string): string {
 }
 
 /**
- * Split a class attribute's contents into tokens, keeping the surrounding
- * whitespace so an unchanged attribute can be left exactly as it was written.
+ * The whitespace a rewritten attribute should put between its tokens.
+ *
+ * Long class lists are routinely written one token per line, and joining the
+ * rewrite with single spaces would collapse the whole attribute onto one line -
+ * a diff about layout, on every line, hiding the one token that actually
+ * changed. So the separator is taken from the attribute rather than assumed:
+ * whichever run of whitespace the author used most between tokens, which is a
+ * single space for an ordinary attribute and the indented newline for a
+ * multi-line one.
  *
  * @param value - Raw contents of a class attribute, without the quotes.
- * @returns The tokens and the whitespace that framed them.
+ * @returns The separator to join rewritten tokens with.
  */
-export function splitClassValue(value: string): { leading: string, tokens: string[], trailing: string } {
+export function dominantSeparator(value: string): string {
+  const separators = value.trim().match(/\s+/g)
+  if (!separators?.length) return ' '
+
+  const counts = new Map<string, number>()
+  for (const separator of separators) counts.set(separator, (counts.get(separator) ?? 0) + 1)
+
+  // Ties go to the longer separator: an attribute split across lines that
+  // happens to put two tokens on one line is still a multi-line attribute.
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0][0]
+}
+
+export interface SplitClassValue {
+  /** Whitespace before the first token. */
+  leading: string
+  /** The tokens themselves. */
+  tokens: string[]
+  /** Whitespace after the last token. */
+  trailing: string
+  /** The whitespace to put between tokens when rewriting. */
+  separator: string
+}
+
+/**
+ * Split a class attribute's contents into tokens, keeping the whitespace that
+ * framed and separated them so a rewrite reads like the code around it.
+ *
+ * @param value - Raw contents of a class attribute, without the quotes.
+ * @returns The tokens and the whitespace that shaped them.
+ */
+export function splitClassValue(value: string): SplitClassValue {
   const leading = /^\s*/.exec(value)?.[0] ?? ''
   const trailing = value.trim() ? (/\s*$/.exec(value)?.[0] ?? '') : ''
   const tokens = value.trim() ? value.trim().split(/\s+/) : []
-  return { leading, tokens, trailing }
+  return { leading, tokens, trailing, separator: dominantSeparator(value) }
 }

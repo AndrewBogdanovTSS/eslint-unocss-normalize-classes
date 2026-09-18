@@ -153,7 +153,7 @@ export async function planRewrite(value: string, deps: PlanDeps): Promise<PlanRe
   const unproven: UnprovenRewrite[] = []
   if (!value.trim()) return { value, changed: false, unproven }
 
-  const { leading, tokens: original, trailing } = splitClassValue(value)
+  const { leading, tokens: original, trailing, separator } = splitClassValue(value)
   const group = parseVariantGroup(original.join(' '))
   const expanded = group.expanded.trim().split(/\s+/).filter(Boolean)
 
@@ -163,14 +163,17 @@ export async function planRewrite(value: string, deps: PlanDeps): Promise<PlanRe
   const collapsed = await collapseShortcuts(normalized, deps, unproven)
 
   const prefixes = [...group.prefixes]
-  const joined = prefixes.length
-    ? collapseVariantGroup(collapsed.join(' '), prefixes)
-    : collapsed.join(' ')
+  // Variant-group collapsing works on a space-joined list, so the author's
+  // separator is applied afterwards rather than fought with.
+  const rewritten = prefixes.length
+    ? collapseVariantGroup(collapsed.join(' '), prefixes).split(/\s+/).filter(Boolean)
+    : collapsed
+  const joined = rewritten.join(separator)
 
   // Compared against the tokens as written, not against the expanded form, so
   // an attribute that only ever round-tripped through the variant-group
   // helpers is reported as unchanged.
-  const changed = joined !== original.join(' ')
+  const changed = joined !== original.join(separator)
   return {
     value: changed ? `${leading}${joined}${trailing}` : value,
     changed,

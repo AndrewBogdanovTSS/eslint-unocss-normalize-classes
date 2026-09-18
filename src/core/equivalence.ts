@@ -36,11 +36,74 @@ export interface EquivalenceOptions {
   rootFontSize?: number | false
 }
 
-const DECLARATION_BLOCK = /\{([^{}]*)\}/g
 const REM_LENGTH = /(-?[\d.]+)rem\b/g
 const CSS_VAR_REFERENCE = /var\((--[\w-]+)\)/g
 
+/**
+ * A class selector, escapes included - `.hover\:c-white`, `.\@hover\:bg-brand`.
+ * Stops at an unescaped `:` so the pseudo-class survives the replacement.
+ */
+const CLASS_SELECTOR = /\.(?:\\.|[^\\\s.,:>+~()[\]{}])+/g
+
 const isCustomProperty = (declaration: string): boolean => declaration.split(':')[0].trim().startsWith('--')
+
+interface StyleRule {
+  /** Enclosing at-rules, e.g. `@media (min-width: 640px)`. */
+  context: string
+  /** The selector with class names replaced by `&`, so `:hover` survives and `.c-black` does not. */
+  shape: string
+  /** The declarations in the rule. */
+  declarations: string[]
+}
+
+/**
+ * Split a stylesheet into rules, keeping the at-rules each one sits inside.
+ *
+ * A hand-rolled scan rather than a regex, because at-rules nest and the
+ * conditions they impose are exactly what must not be thrown away: two rules
+ * with identical declarations are not the same rule if one of them only applies
+ * above 640px.
+ */
+function parseRules(css: string, context: string[] = []): StyleRule[] {
+  const rules: StyleRule[] = []
+  let prelude = ''
+  let index = 0
+
+  while (index < css.length) {
+    const char = css[index]
+
+    if (char === '{') {
+      let depth = 1
+      let end = index + 1
+      while (end < css.length && depth > 0) {
+        if (css[end] === '{') depth++
+        else if (css[end] === '}') depth--
+        end++
+      }
+
+      const body = css.slice(index + 1, end - 1)
+      const head = prelude.trim()
+
+      if (head.startsWith('@') && body.includes('{')) rules.push(...parseRules(body, [...context, head]))
+      else {
+        rules.push({
+          context: context.join(' '),
+          shape: head.replace(CLASS_SELECTOR, '&'),
+          declarations: body.split(';').map((declaration) => declaration.trim()).filter(Boolean),
+        })
+      }
+
+      prelude = ''
+      index = end
+      continue
+    }
+
+    prelude += char
+    index++
+  }
+
+  return rules
+}
 
 /**
  * Reduce generated CSS to the set of declarations a browser would end up
@@ -57,20 +120,26 @@ export function computedDeclarations(css: string, options: EquivalenceOptions = 
     ? css
     : css.replace(REM_LENGTH, (_, value: string) => `${Number.parseFloat(value) * rootFontSize}px`)
 
-  const declarations = [...normalized.matchAll(DECLARATION_BLOCK)]
-    .flatMap(([, body]) => body.split(';').map((declaration) => declaration.trim()))
-    .filter(Boolean)
+  const rules = parseRules(normalized)
 
   const customProperties = new Map<string, string>()
-  for (const declaration of declarations) {
-    const [property, ...value] = declaration.split(':')
-    if (isCustomProperty(declaration)) customProperties.set(property.trim(), value.join(':').trim())
+  for (const rule of rules) {
+    for (const declaration of rule.declarations) {
+      const [property, ...value] = declaration.split(':')
+      if (isCustomProperty(declaration)) customProperties.set(property.trim(), value.join(':').trim())
+    }
   }
 
-  return declarations
-    .filter((declaration) => !isCustomProperty(declaration))
-    .map((declaration) =>
-      declaration.replace(CSS_VAR_REFERENCE, (raw, name: string) => customProperties.get(name) ?? raw))
+  return rules
+    .flatMap((rule) => rule.declarations
+      .filter((declaration) => !isCustomProperty(declaration))
+      .map((declaration) => {
+        const resolved = declaration.replace(CSS_VAR_REFERENCE, (raw, name: string) =>
+          customProperties.get(name) ?? raw)
+        // The condition travels with the declaration: `padding:1rem` inside a
+        // media query is not the same promise as `padding:1rem` outside one.
+        return `${rule.context} ${rule.shape} { ${resolved} }`.trim()
+      }))
     .sort()
     .join(' | ')
 }

@@ -80,12 +80,52 @@ check('a fix that changes the rendered CSS is reported and never written', async
   assert.match(result.messages[0].message, /generates different CSS/)
 })
 
-check('the example file is fixed exactly as far as it can be proved', async () => {
-  const result = await lint(readFileSync(join(fixture, 'example.vue'), 'utf8'))
-  assert.match(result.output, /class="b op-50"/)
-  assert.match(result.output, /class="flex center gap-2"/)
-  // `size-4` is provable and expands; `blur-[4px]` sits right next to it and is not.
-  assert.match(result.output, /class="w-4 h-4 blur-\[4px\]"/)
+check('the example component is fixed exactly as far as it can be proved', async () => {
+  const source = readFileSync(join(fixture, 'example.vue'), 'utf8')
+  const result = await lint(source)
+  const output = result.output
+
+  // every blocklist entry form, through the built worker
+  assert.match(output, /class="w-4 h-4 flex"/, 'one token expanding into two')
+  assert.match(output, /class="ws-nowrap lh-4"/, 'a string entry and a predicate entry')
+  assert.match(output, /class="w-4 h-4 squircle"/, 'a chain, resolved in one pass')
+
+  // variants survive the expand/rewrite/collapse round trip
+  assert.match(output, /class="hover:\(b op-50\) @hover:b sm:hover:!b"/, 'variants and groups')
+
+  // a multi-line attribute stays multi-line, and the shortcut still collapses
+  assert.ok(
+    output.includes('class="\n        b\n        op-50\n        center\n      "'),
+    'a multi-line attribute was not kept multi-line',
+  )
+
+  // what must not be touched
+  assert.match(output, /const fallbackClasses = 'border opacity-50'/, 'the script block')
+  assert.match(output, /\.border \{/, 'the style block')
+  assert.match(output, /:class="\{ 'opacity-50': loading \}"/, 'a dynamic binding')
+  assert.match(output, /<span border op-50 \/>/, 'valueless attributify attributes')
+  assert.match(output, /class="float-left"/, 'a blocklist entry with no fix')
+  assert.match(output, /class="my-own-class another-one"/, 'classes the config does not know')
+
+  // the refusals, still reported after the fix pass
+  assert.match(output, /class="b blur-\[4px\] text-center"/, 'the provable half fixed, the rest left')
+  assert.equal(result.messages.length, 2, 'two refusals reported')
+  for (const message of result.messages) assert.match(message.message, /generates different CSS/)
+})
+
+check('fixing is idempotent - a second pass over the output changes nothing', async () => {
+  const once = await lint(readFileSync(join(fixture, 'example.vue'), 'utf8'))
+  const twice = await lint(once.output)
+  assert.equal(twice.output, undefined, 'the rule kept rewriting its own output')
+})
+
+check('a config that never declared a fix still collapses shortcuts', async () => {
+  const noFixes = join(root, 'test', 'fixtures', 'no-fixes', 'uno.config.ts')
+  const collapsed = await lint('<template><div class="items-center justify-center" /></template>', { configPath: noFixes })
+  assert.equal(collapsed.output, '<template><div class="center" /></template>')
+
+  const untouched = await lint('<template><div class="border" /></template>', { configPath: noFixes })
+  assert.equal(untouched.output, undefined, 'a blocklist without fixes rewrote something')
 })
 
 let failed = 0

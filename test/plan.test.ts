@@ -97,4 +97,39 @@ describe('planRewrite', () => {
     const plan = await planRewrite('border', deps({ declaredFix: async () => null }))
     expect(plan.changed).toBe(false)
   })
+
+  it('keeps a multi-line attribute multi-line when a shortcut collapses', async () => {
+    const plan = await planRewrite('\n  flex\n  items-center\n  justify-center\n', deps({
+      shortcuts: [{ name: 'center', tokens: ['items-center', 'justify-center'] }],
+    }))
+    expect(plan.value).toBe('\n  flex\n  center\n')
+  })
+
+  it('leaves a multi-line attribute byte for byte when nothing is proved', async () => {
+    // The shortcut source used to reformat every attribute it looked at, which
+    // reported a change on files where nothing had been normalised.
+    const value = '\n  flex\n  gap-2\n'
+    const plan = await planRewrite(value, deps({
+      shortcuts: [{ name: 'center', tokens: ['items-center', 'justify-center'] }],
+    }))
+    expect(plan.changed).toBe(false)
+    expect(plan.value).toBe(value)
+  })
+
+  it('uses the author separator when a fix changes the token count', async () => {
+    const plan = await planRewrite('\n  size-4\n  flex\n', deps({
+      declaredFix: async (token) => (token === 'size-4' ? ['w-4', 'h-4'] : null),
+    }))
+    expect(plan.value).toBe('\n  w-4\n  h-4\n  flex\n')
+  })
+
+  it('reports a refusal from each source separately', async () => {
+    const plan = await planRewrite('border items-center justify-center', deps({
+      declaredFix: async (token) => (token === 'border' ? ['b'] : null),
+      shortcuts: [{ name: 'center', tokens: ['items-center', 'justify-center'] }],
+      prove: async () => false,
+    }))
+    expect(plan.changed).toBe(false)
+    expect(plan.unproven.map((entry) => entry.source)).toEqual(['blocklist', 'shortcut'])
+  })
 })
