@@ -167,10 +167,10 @@ importers:
   .:
     dependencies:
       '@unocss/config':
-        specifier: ^66.10.5
+        specifier: ^66.6.8
         version: 66.10.5
       '@unocss/core':
-        specifier: ^66.10.5
+        specifier: ^66.6.8
         version: 66.10.5
       synckit:
         specifier: ^0.11.13
