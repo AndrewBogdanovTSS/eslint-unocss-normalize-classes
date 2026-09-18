@@ -36,6 +36,10 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
+    "./config": {
+      "types": "./dist/config.d.mts",
+      "import": "./dist/config.mjs"
+    },
     "./worker": "./dist/worker.mjs",
     "./package.json": "./package.json"
   },

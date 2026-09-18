@@ -53,6 +53,14 @@ check('the entry point exports the plugin and its parts', async () => {
   assert.ok(api.default.rules.classes, 'the plugin exposes no `classes` rule')
 })
 
+check('the config subpath imports without starting a worker', async () => {
+  const { hideFixes } = await import(pathToFileURL(join(root, 'dist', 'config.mjs')).href)
+  const [[, meta]] = hideFixes([[/^border$/, { message: 'use "b"', fix: () => ['b'] }]])
+
+  assert.equal(typeof meta.fix, 'function', 'the fix must stay readable')
+  assert.deepEqual(Object.keys({ ...meta }), ['message'], 'no function may survive a spread')
+})
+
 check('the plugin reports the version package.json declares', () => {
   assert.equal(plugin.meta.version, pkg.version)
 })

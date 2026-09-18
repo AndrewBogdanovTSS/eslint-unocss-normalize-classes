@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { hideFixes } from '../src/config'
 import { planRewrite } from '../src/core/plan'
 import type { PlanDeps } from '../src/core/plan'
 
@@ -227,5 +228,24 @@ describe('collapsing tokens that share a variant', () => {
   it('keeps a group the author already wrote, even below the minimum', async () => {
     const plan = await planRewrite('md:(text-center)', deps({ variantGroups: { minimum: 5 } }))
     expect(plan.value).toBe('md:(text-center)')
+  })
+})
+
+describe('hideFixes', () => {
+  it('keeps the fix readable while taking it out of a spread', () => {
+    const [[, meta]] = hideFixes([[/^border$/, { message: 'use "b"', fix: () => ['b'] }]]) as [[unknown, any]]
+
+    // How this plugin reads it: still there.
+    expect(typeof meta.fix).toBe('function')
+    expect(meta.fix()).toEqual(['b'])
+
+    // How `unocss/blocklist` sends it to a worker: no function crosses.
+    expect(Object.keys({ ...meta })).toEqual(['message'])
+    expect(JSON.parse(JSON.stringify({ ...meta }))).toEqual({ message: 'use "b"' })
+  })
+
+  it('leaves entries without a fix, and non-array entries, alone', () => {
+    const blocklist = ['tab', [/^float-/, { message: 'use flex' }]]
+    expect(hideFixes(blocklist)).toEqual(blocklist)
   })
 })

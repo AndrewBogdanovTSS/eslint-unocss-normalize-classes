@@ -18,6 +18,9 @@ export default defineConfig({
   // renamed chunk would break that lookup silently.
   entry: {
     index: 'src/index.ts',
+    // Importable from a `uno.config.ts`, which the build loads too - so it
+    // must not drag in the rule, whose module scope starts a worker.
+    config: 'src/config.ts',
     worker: 'src/worker.ts',
   },
   format: ['esm'],

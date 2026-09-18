@@ -1,3 +1,4 @@
+import { hideFixes } from 'eslint-plugin-unocss-normalize-classes/config'
 import { defineConfig, presetWind3 } from 'unocss'
 
 /**
@@ -63,7 +64,7 @@ export default defineConfig({
     [/^pill-(\d+)$/, ([, n]: string[]) => `rounded-full px-${n}`],
   ],
 
-  blocklist: [
+  blocklist: hideFixes([
     // ---- fixes that are correct ------------------------------------------
 
     // RegExp, fix returning an array
@@ -145,5 +146,9 @@ export default defineConfig({
       message: 'use "c-*" for colours',
       fix: (v: string) => [v.replace(/^text-/, 'c-')],
     }],
-  ] as never,
+    // The fixture exports its fixes the way the README tells projects to -
+    // hidden from object spreads, because `unocss/blocklist` sends a matched
+    // entry's meta to a worker thread and a function cannot cross that
+    // boundary. So the suite also proves a non-enumerable `fix` is still read.
+  ]) as never,
 })

@@ -105,6 +105,24 @@ blocklist: [
 ]
 ```
 
+> **Wrap the list in `hideFixes` if you also run `unocss/blocklist`.**
+>
+> ```ts
+> import { hideFixes } from 'eslint-plugin-unocss-normalize-classes/config'
+>
+> blocklist: hideFixes([
+>   [/^border$/, { message: 'use shorter "b"', fix: () => ['b'] }],
+> ])
+> ```
+>
+> That rule sends a matched entry's meta to a worker thread, and it sends the
+> whole object - `{ ...meta, message }`. A function cannot cross that boundary.
+> On a real project, linting a two-line file went from **12 seconds to 13
+> minutes** with an ordinary `fix` property. `hideFixes` defines it
+> non-enumerably, which takes it out of the spread and leaves property access -
+> how this plugin reads it - untouched. The helper imports nothing, so it is
+> safe in a config your build also loads.
+
 `fix` returns the tokens that replace the blocked one - one, or several. This
 is an additive convention: `BlocklistMeta` upstream carries only `message`, and
 UnoCSS ignores meta keys it does not recognise, so a config can declare `fix`
