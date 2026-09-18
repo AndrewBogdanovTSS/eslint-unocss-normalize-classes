@@ -127,7 +127,19 @@ async function preflight(pkg: { name: string }, target: string, skipChecks: bool
   capture('git fetch origin --quiet')
   const local = capture('git rev-parse HEAD')
   const remote = capture(`git rev-parse origin/${main}`)
-  if (local && remote && local !== remote) {
+  if (!local || !remote) {
+    // Either ref failing to resolve - an unborn branch, a remote that was never
+    // fetched - means this was not checked. Reporting "in sync" here would be a
+    // pass for a comparison that never happened, which is the exact failure
+    // this script exists to prevent elsewhere.
+    findings.push({
+      level: 'unverifiable',
+      claim: `this commit is the one origin/${main} has`,
+      detail: !local
+        ? 'HEAD does not resolve yet - nothing is committed on this branch'
+        : `origin/${main} does not resolve - the branch has never been pushed or fetched`,
+    })
+  } else if (local !== remote) {
     const behind = capture(`git rev-list --count HEAD..origin/${main}`)
     const ahead = capture(`git rev-list --count origin/${main}..HEAD`)
     findings.push({
