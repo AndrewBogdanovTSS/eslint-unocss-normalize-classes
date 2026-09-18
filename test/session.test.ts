@@ -284,3 +284,27 @@ describe('a config whose fixes undo each other', () => {
     expect(result.changed).toBe(false)
   })
 })
+
+describe('separating colours from the rest of text-*', () => {
+  it('rewrites a colour, shade and opacity included', async () => {
+    expect((await plan('text-red-500')).value).toBe('c-red-500')
+    expect((await plan('text-red-500/50')).value).toBe('c-red-500/50')
+  })
+
+  it('refuses the same rewrite for a font size', async () => {
+    // The fixture's entry is deliberately loose - it proposes `c-*` for every
+    // `text-*`. `c-sm` generates nothing, so the prover is what tells a colour
+    // apart from a size, with no pattern doing the work.
+    const result = await plan('text-sm')
+
+    expect(result.changed).toBe(false)
+    expect(result.unproven).toEqual([{ before: 'text-sm', after: 'c-sm', source: 'blocklist' }])
+  })
+
+  it('leaves a whole class list correct when the two are mixed', async () => {
+    const result = await plan('text-red-500 text-sm flex')
+
+    expect(result.value).toBe('c-red-500 text-sm flex')
+    expect(result.unproven).toHaveLength(1)
+  })
+})

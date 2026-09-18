@@ -110,6 +110,42 @@ is an additive convention: `BlocklistMeta` upstream carries only `message`, and
 UnoCSS ignores meta keys it does not recognise, so a config can declare `fix`
 today without waiting for anything to change.
 
+#### Telling a colour apart from the rest of `text-*`
+
+`text-*` is three unrelated utilities behind one prefix - a colour
+(`text-red-300`), a size (`text-sm`), an alignment (`text-center`) - and only
+the colour has a `c-*` spelling. There are two ways to write that entry, and
+the prover changes which one you need.
+
+**Name the colours**, read off your theme so the pattern cannot drift:
+
+```ts
+const wind = presetWind3()
+const colours = Object.keys(wind.theme?.colors ?? {}).join('|')
+
+blocklist: [
+  [new RegExp(`^text-(?:${colours})(?:-\d+)?(?:\/\d+)?$`), {
+    message: 'use shorter "c-*" for colours',
+    fix: (v) => [v.replace(/^text-/, 'c-')],
+  }],
+]
+```
+
+Shade and opacity are optional there on purpose: `text-red`, `text-red-300`
+and `text-red-500/50` are all colours, and `c-*` takes all three.
+
+**Or do not tell them apart at all**, and let the proof do it:
+
+```ts
+[/^text-(.+)$/, { message: 'use "c-*" for colours', fix: (v) => [v.replace(/^text-/, 'c-')] }],
+```
+
+This proposes `c-*` for every `text-*`. `c-red-300` generates the same CSS as
+`text-red-300`, so it is applied; `c-sm` and `c-center` generate nothing at
+all, so they are reported and never written. The loose pattern is *safe* -
+it just costs a report per non-colour token, which is why naming the colours
+is still the better entry.
+
 A fix written against the bare utility still answers for a token carrying
 variants or an important marker: `^border$` fixes `sm:hover:!border`. Chains
 are followed, so `ma-auto` -> `m-auto` -> `m-a` resolves in one pass. Variant

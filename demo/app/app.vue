@@ -9,7 +9,7 @@
       </p>
     </header>
 
-    <div class="lg:hover:(text-red-30 cols-2) grid cols-1 gap-6">
+    <div class="grid cols-1 gap-6">
       <MessyCard />
       <TidyCard />
     </div>

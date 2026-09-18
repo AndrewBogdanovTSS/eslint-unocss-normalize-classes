@@ -127,5 +127,23 @@ export default defineConfig({
     [/^empty-fix$/, { message: 'this entry returns nothing', fix: () => [] }],
 
     [/^identity-fix$/, { message: 'this entry returns its input', fix: (v: string) => [v] }],
+
+    // ---- a deliberately loose pattern, separated by the prover -----------
+
+    // `text-*` is three unrelated utilities behind one prefix: a colour
+    // (`text-red-500`), a size (`text-sm`) and an alignment (`text-center`).
+    // Only the colour has a `c-*` spelling.
+    //
+    // This entry does not try to tell them apart. It proposes `c-*` for every
+    // `text-*`, and the prover throws out the ones that are not colours:
+    // `c-sm` and `c-center` generate no CSS at all, so they are reported
+    // rather than written. Correct without a precise pattern - at the cost of
+    // a report per non-colour token, which is why the demo's config names its
+    // colours instead. Last in the list, so the specific entries above still
+    // win for the tokens they name.
+    [/^text-(.+)$/, {
+      message: 'use "c-*" for colours',
+      fix: (v: string) => [v.replace(/^text-/, 'c-')],
+    }],
   ] as never,
 })

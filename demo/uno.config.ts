@@ -1,5 +1,17 @@
 import { defineConfig, presetWind3, transformerVariantGroup } from 'unocss'
 
+const wind = presetWind3()
+
+/**
+ * Every colour name the preset knows - `red`, `blue`, `slate`, and keywords
+ * like `current` and `transparent`.
+ *
+ * Read off the theme rather than typed out, so the pattern below cannot drift
+ * from the palette. A project with its own colours would take them from its own
+ * theme the same way.
+ */
+const colourNames = Object.keys(wind.theme?.colors ?? {}).join('|')
+
 /**
  * A small, ordinary project config.
  *
@@ -23,8 +35,26 @@ export default defineConfig({
   },
 
   blocklist: [
-    [/^border$/, { message: 'use shorter "b"', fix: () => ['b'] }],
-    [/^opacity-(\d+)$/, { message: 'use shorter "op-*"', fix: (v: string) => [v.replace('opacity-', 'op-')] }],
+    [/^border$/, {
+      message: 'use shorter "b"',
+      fix: () => ['b']
+    }],
+
+    // `text-*` is three unrelated utilities wearing one prefix: a colour
+    // (`text-red-300`), a font size (`text-sm`) and an alignment
+    // (`text-center`). Only the colour has a `c-*` spelling, so the pattern
+    // names the colours rather than guessing from the shape of the token.
+    //
+    // Shade and opacity are both optional: `text-red`, `text-red-300` and
+    // `text-red-500/50` are all colours, and `c-*` accepts all three.
+    [new RegExp(`^text-(?:${colourNames})(?:-\\d+)?(?:\\/\\d+)?$`), {
+      message: 'use shorter "c-*" for colours',
+      fix: (v: string) => [v.replace(/^text-/, 'c-')]
+    }],
+    [/^opacity-(\d+)$/, {
+      message: 'use shorter "op-*"',
+      fix: (v: string) => [v.replace('opacity-', 'op-')]
+    }],
     [/^size-(.+)$/, {
       message: 'use "w-* h-*"',
       fix: (v: string) => {
