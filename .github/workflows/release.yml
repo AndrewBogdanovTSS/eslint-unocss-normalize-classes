@@ -8,8 +8,12 @@ on:
 # public record of which commit and which workflow run produced the tarball.
 # The alternative is a README sentence asserting that the published package was
 # built from this source.
+#
+# `contents: write` is for the GitHub Release at the end. A tag is a git ref and
+# a Release is a separate object, so pushing a tag alone leaves the repository
+# saying nothing about a version that is already installable from npm.
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -61,3 +65,16 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # After the publish, never before. A Release created first would announce
+      # a version that the registry might then refuse, and the announcement is
+      # the part people read.
+      #
+      # `--verify-tag` refuses to invent a release for a tag that is not on the
+      # remote; `--generate-notes` writes the notes from the commits since the
+      # previous tag, so the changelog is the history rather than a second
+      # account of it written by hand.
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
