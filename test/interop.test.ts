@@ -199,3 +199,39 @@ describe('what the sorter does to layout', () => {
     expect(messages.map((message) => message.message)).toEqual(['UnoCSS utilities are not ordered'])
   })
 })
+
+describe('variant grouping beside the sorter', () => {
+  const GROUPING: Linter.RulesRecord = {
+    'unocss-normalize/classes': ['error', { configPath, variantGroups: true }],
+    'unocss/order': 'error',
+  }
+
+  it('groups a run the sorter keeps together, and settles', async () => {
+    const { output, stable, messages } = await fixUntilStable(
+      '<template><div class="md:border md:opacity-50" /></template>',
+      GROUPING,
+    )
+
+    expect(output).toBe('<template><div class="md:(b op-50)" /></template>')
+    expect(stable).toBe(true)
+    expect(messages).toEqual([])
+  })
+
+  it('declines to group a run the sorter would tear apart', async () => {
+    // `unocss/order` expands a group, sorts the members apart, then collapses
+    // only what stayed adjacent - leaving one member loose and the other in a
+    // group of one. Grouping these would be undone every pass and remade the
+    // next, so the run is left alone and the lint comes out clean.
+    const { output, stable, messages } = await fixUntilStable(
+      '<template><div class="lg:hover:c-brand lg:hover:flex grid gap-2" /></template>',
+      GROUPING,
+    )
+
+    expect(output).not.toContain('lg:hover:(')
+    expect(stable).toBe(true)
+    // The sorter is satisfied, which is the whole point: it is no longer
+    // reporting an order it can never reach. (`c-brand` still draws a refusal
+    // from the fixture's deliberately wrong fix - a different claim.)
+    expect(messages.filter((message) => message.ruleId === 'unocss/order')).toEqual([])
+  })
+})

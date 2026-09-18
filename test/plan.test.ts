@@ -177,9 +177,25 @@ describe('collapsing tokens that share a variant', () => {
     expect(plan.value).toBe('md:(text-center mx-a)')
   })
 
-  it('leaves tokens without a shared prefix where they are', async () => {
-    const plan = await planRewrite('md:text-center flex md:mx-a p-4', deps({ variantGroups: grouping }))
+  it('groups an adjacent run and leaves the rest in place', async () => {
+    const plan = await planRewrite('md:text-center md:mx-a flex p-4', deps({ variantGroups: grouping }))
     expect(plan.value).toBe('md:(text-center mx-a) flex p-4')
+  })
+
+  it('never moves a token in order to group it', async () => {
+    // Ordering is `unocss/order`'s job. Gathering scattered tokens also fights
+    // it: the sorter expands a group, sorts the members apart, then re-collapses
+    // only what stayed adjacent - so a gathered group is split on the next pass
+    // and regrouped on the one after, forever.
+    const plan = await planRewrite('md:text-center flex md:mx-a p-4', deps({ variantGroups: grouping }))
+    expect(plan.changed).toBe(false)
+  })
+
+  it('leaves a prefix that appears in two separate runs', async () => {
+    // Collapsing consecutive tokens would turn the second run into its own
+    // group, which is noise rather than a simplification.
+    const plan = await planRewrite('md:a md:b flex md:c md:d', deps({ variantGroups: grouping }))
+    expect(plan.changed).toBe(false)
   })
 
   it('does not group a prefix carried by only one token', async () => {

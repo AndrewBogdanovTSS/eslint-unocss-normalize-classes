@@ -45,6 +45,12 @@ export interface PlanDeps {
    * Whether two class lists generate the same CSS under the project's config.
    */
   prove: (before: string, after: string) => Promise<boolean>
+  /**
+   * Where `unocss/order` would place a token, or `null` when the generator
+   * cannot parse it. Used only to decide whether a group is one that sorter
+   * will accept - see `groupablePrefixes`.
+   */
+  sortKey?: (token: string) => Promise<number | null>
   /** Collapsible shortcuts, longest first. */
   shortcuts: readonly ShortcutSet[]
   /**
@@ -163,31 +169,102 @@ async function collapseShortcuts(
   return current
 }
 
+interface PrefixRun {
+  prefix: string
+  /** Indexes of the tokens in the run, in source order. */
+  indexes: number[]
+}
+
+/** Maximal runs of neighbouring tokens that share a variant prefix exactly. */
+function prefixRuns(tokens: readonly string[]): PrefixRun[] {
+  const runs: PrefixRun[] = []
+
+  tokens.forEach((token, index) => {
+    // A token already carrying a bracket is a group or an arbitrary value, and
+    // neither is ours to rearrange.
+    const prefix = token.includes('(') || token.includes(')') ? '' : splitToken(token).prefix
+    if (!prefix) return
+
+    const last = runs.at(-1)
+    if (last?.prefix === prefix && last.indexes.at(-1) === index - 1) last.indexes.push(index)
+    else runs.push({ prefix, indexes: [index] })
+  })
+
+  return runs
+}
+
+/**
+ * Whether `unocss/order` would leave a run of tokens next to each other.
+ *
+ * It sorts by asking the generator where each token belongs, and then collapses
+ * only the group members that stayed adjacent. A group whose members sort apart
+ * is therefore torn in half on its next pass - one member escaping, the other
+ * left in a group of one - and regrouped by this rule on the pass after that.
+ * Neither rule is wrong on its own; together they never settle.
+ *
+ * So a run is only groupable when the sorter agrees it belongs together.
+ */
+async function sortsTogether(
+  tokens: readonly string[],
+  run: PrefixRun,
+  sortKey: (token: string) => Promise<number | null>,
+): Promise<boolean> {
+  const keyed: { index: number, key: number, token: string }[] = []
+
+  for (const [index, token] of tokens.entries()) {
+    const key = await sortKey(token)
+    // An unparseable token is sorted to the front by `unocss/order`, ahead of
+    // everything keyed - which makes its effect on adjacency hard to predict,
+    // so nothing is grouped when one is present.
+    if (key === null) return false
+    keyed.push({ index, key, token })
+  }
+
+  keyed.sort((a, b) => a.key - b.key || a.token.localeCompare(b.token))
+
+  const positions = run.indexes
+    .map((index) => keyed.findIndex((entry) => entry.index === index))
+    .sort((a, b) => a - b)
+
+  return positions.every((position, offset) => position === positions[0] + offset)
+}
+
 /**
  * The variant prefixes worth collapsing into a group.
  *
- * A prefix qualifies when enough tokens share it exactly - `md:text-center` and
- * `md:mx-a` share `md:`, while `md:text-center` and `md:hover:mx-a` do not,
- * because collapsing those would need a nested group and the flat one would be
- * wrong. Tokens that already carry a bracket are left out: they are either a
- * group already or an arbitrary value, and neither is ours to rearrange.
+ * Two conditions, and both exist to keep this rule out of the sorter's way:
+ *
+ *   - the tokens are **already neighbours**. Gathering scattered tokens would
+ *     be reordering, which is `unocss/order`'s job, not this rule's.
+ *   - the sorter would **keep them** neighbours. See `sortsTogether`.
+ *
+ * A prefix must also match exactly: `md:text-center` and `md:hover:mx-a` do not
+ * share one, and a flat group of the two would be wrong.
  *
  * @param tokens - The class list, after the other sources have run.
- * @param minimum - How many tokens must share a prefix before it is grouped.
+ * @param minimum - How many neighbouring tokens must share a prefix.
+ * @param sortKey - Where the sorter would place a token, when it can be asked.
  * @returns The prefixes to hand to `collapseVariantGroup`.
  */
-export function groupablePrefixes(tokens: readonly string[], minimum: number): string[] {
+export async function groupablePrefixes(
+  tokens: readonly string[],
+  minimum: number,
+  sortKey?: (token: string) => Promise<number | null>,
+): Promise<string[]> {
+  const candidates = prefixRuns(tokens).filter((run) => run.indexes.length >= minimum)
   const counts = new Map<string, number>()
+  for (const run of prefixRuns(tokens)) counts.set(run.prefix, (counts.get(run.prefix) ?? 0) + 1)
 
-  for (const token of tokens) {
-    if (token.includes('(') || token.includes(')')) continue
-    const { prefix } = splitToken(token)
-    if (prefix) counts.set(prefix, (counts.get(prefix) ?? 0) + 1)
+  const prefixes: string[] = []
+  for (const run of candidates) {
+    // `collapseVariantGroup` works on consecutive tokens, so a prefix appearing
+    // in two runs would also collapse the second one - into a group of one.
+    if (counts.get(run.prefix) !== 1) continue
+    if (sortKey && !await sortsTogether(tokens, run, sortKey)) continue
+    prefixes.push(run.prefix)
   }
 
-  return [...counts.entries()]
-    .filter(([, count]) => count >= minimum)
-    .map(([prefix]) => prefix)
+  return prefixes
 }
 
 /**
@@ -222,7 +299,8 @@ export async function planRewrite(value: string, deps: PlanDeps): Promise<PlanRe
   // added only when the project asked for grouping.
   const prefixes = new Set(group.prefixes)
   if (deps.variantGroups) {
-    for (const prefix of groupablePrefixes(collapsed, deps.variantGroups.minimum)) prefixes.add(prefix)
+    const groupable = await groupablePrefixes(collapsed, deps.variantGroups.minimum, deps.sortKey)
+    for (const prefix of groupable) prefixes.add(prefix)
   }
   // Variant-group collapsing works on a space-joined list, so the author's
   // separator is applied afterwards rather than fought with.

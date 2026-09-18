@@ -68,6 +68,7 @@ interface Session {
 const sessions = new Map<string, Promise<Session>>()
 const proofs = new Map<string, boolean>()
 const fixes = new Map<string, string[] | null>()
+const sortKeys = new Map<string, number | null>()
 
 const cacheKey = (...parts: unknown[]): string => JSON.stringify(parts)
 
@@ -150,6 +151,29 @@ function declaredFix(session: Session, token: string): string[] | null {
   return onBody ? onBody.map((replacement) => joinToken(parts, replacement)) : null
 }
 
+/**
+ * Where `unocss/order` would place a token.
+ *
+ * The same arithmetic that rule's worker uses - the rule's own index plus a
+ * rank for how many variants it carries - so this answers what it would do,
+ * rather than what seems reasonable. `null` when the generator cannot parse
+ * the token, which is how the sorter decides something is unknown.
+ *
+ * @param session - The generators for this config.
+ * @param token - A single class token.
+ * @returns The sort key, or `null` for a token the generator does not know.
+ */
+async function sortKey(session: Session, token: string): Promise<number | null> {
+  if (!session.uno.config.details) session.uno.config.details = true
+
+  const parsed = await session.uno.parseToken(token) as [number, ...unknown[]][] | undefined
+  if (!parsed?.length) return null
+
+  const context = parsed[0][5] as { variantHandlers?: unknown[] } | undefined
+  const variantRank = (context?.variantHandlers?.length ?? 0) * 1e5
+  return parsed[0][0] + variantRank
+}
+
 async function prove(
   session: Session,
   before: string,
@@ -174,6 +198,11 @@ async function plan(
   return planRewrite(value, {
     shortcuts: options.shortcuts ? session.shortcuts : [],
     variantGroups: options.variantGroups,
+    sortKey: async (token) => {
+      const key = cacheKey(scope, 'sort', token)
+      if (!sortKeys.has(key)) sortKeys.set(key, await sortKey(session, token))
+      return sortKeys.get(key) ?? null
+    },
     declaredFix: async (token) => {
       if (!options.blocklist) return null
       const key = cacheKey(scope, token)

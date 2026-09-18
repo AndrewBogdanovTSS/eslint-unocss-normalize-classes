@@ -135,6 +135,16 @@ transformer the grouped class names would produce no CSS at all.
 'unocss-normalize/classes': ['error', { variantGroups: true }],
 ```
 
+Two things it will not do, both so it stays out of `unocss/order`'s way:
+
+- **It never moves a token to group it.** Only tokens already next to each
+  other are collapsed. Ordering is the sorter's job.
+- **It will not form a group the sorter would tear apart.** `unocss/order`
+  expands a group, sorts the members, and re-collapses only what stayed
+  adjacent - so a group whose members sort apart comes back as one loose token
+  and one group of one, gets regrouped here, and never settles. The rule asks
+  the generator where each token would sort and declines those runs.
+
 `true` groups a prefix as soon as two tokens share it; `{ minimum: 3 }` waits
 for three. Only exact prefixes are grouped - `md:a` and `md:hover:b` do not
 share one, and flattening them together would be wrong. A group the author
