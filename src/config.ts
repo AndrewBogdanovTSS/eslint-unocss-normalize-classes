@@ -3,8 +3,42 @@
  *
  * Deliberately separate from the plugin entry point: importing that one builds
  * a worker, and a UnoCSS config is loaded by the build as well as by ESLint.
- * Nothing here imports anything.
+ * Nothing here imports anything at runtime - the one import below is a type,
+ * erased before any config loads this file.
  */
+import type { BlocklistMeta, BlocklistRule, BlocklistValue } from '@unocss/core'
+
+/**
+ * A blocklist entry's meta, plus the `fix` this plugin reads.
+ *
+ * Additive by design. `BlocklistMeta` upstream carries only `message`, and
+ * UnoCSS ignores meta keys it does not recognise, so a config can declare
+ * `fix` today without waiting for anything upstream to change. Extending the
+ * upstream interface rather than restating it means any field UnoCSS adds
+ * arrives here too.
+ *
+ * @see {@link FixableBlocklistRule} for the entry this sits inside.
+ */
+export interface FixableBlocklistMeta extends BlocklistMeta {
+  /**
+   * What replaces the blocked token - one replacement, or several.
+   *
+   * Receives the token as written, so an entry matching `^border$` is still
+   * asked about `sm:hover:!border`. A `fix` that throws is treated as no fix:
+   * a mistake in a config should cost a missing rewrite, not a crashed lint.
+   */
+  fix?: (selector: string) => string | string[]
+}
+
+/**
+ * A blocklist entry whose meta may declare a `fix`.
+ *
+ * The same shape as UnoCSS's `BlocklistRule`, with {@link FixableBlocklistMeta}
+ * in place of `BlocklistMeta`. Type a project's blocklist as an array of these
+ * and `fix` is checked where it is written, rather than at the call that
+ * finally reads it.
+ */
+export type FixableBlocklistRule = BlocklistValue | [BlocklistValue, FixableBlocklistMeta]
 
 /**
  * Hide every `fix` from object spreads, keeping it readable.
@@ -30,7 +64,9 @@
  * @param blocklist - Blocklist entries, `fix` written as an ordinary property.
  * @returns The same entries, with each `fix` hidden from enumeration.
  */
-export function hideFixes<T>(blocklist: readonly T[]): T[] {
+export function hideFixes(blocklist: readonly FixableBlocklistRule[]): BlocklistRule[]
+export function hideFixes<T>(blocklist: readonly T[]): T[]
+export function hideFixes(blocklist: readonly unknown[]): unknown[] {
   return blocklist.map((rule) => {
     if (!Array.isArray(rule)) return rule
 
@@ -39,6 +75,6 @@ export function hideFixes<T>(blocklist: readonly T[]): T[] {
 
     const { fix, ...rest } = meta
     Object.defineProperty(rest, 'fix', { value: fix, enumerable: false })
-    return [pattern, rest] as T
+    return [pattern, rest]
   })
 }

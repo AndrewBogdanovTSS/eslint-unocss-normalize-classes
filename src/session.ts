@@ -15,6 +15,7 @@ import process from 'node:process'
 import { loadConfig } from '@unocss/config'
 import { createGenerator } from '@unocss/core'
 import type { UnoGenerator } from '@unocss/core'
+import type { FixableBlocklistMeta } from './config'
 import { isEquivalent } from './core/equivalence'
 import { planRewrite } from './core/plan'
 import type { PlanResult } from './core/plan'
@@ -40,17 +41,6 @@ export interface PlanOptions {
    * refuse to group in exactly the projects that can.
    */
   variantGroups: false | { minimum: number }
-}
-
-/** A blocklist entry that declares how to rewrite what it blocks. */
-interface FixableBlocklistMeta {
-  message?: string | ((selector: string) => string)
-  /**
-   * The additive convention this plugin reads. `BlocklistMeta` upstream carries
-   * only `message`, and UnoCSS ignores meta keys it does not know, so a project
-   * can declare this today without waiting for anything.
-   */
-  fix?: (selector: string) => string | string[]
 }
 
 interface Session {

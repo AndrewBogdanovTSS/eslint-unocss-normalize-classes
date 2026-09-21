@@ -1,5 +1,7 @@
+import type { BlocklistRule } from '@unocss/core'
 import { describe, expect, it, vi } from 'vitest'
 import { hideFixes } from '../src/config'
+import type { FixableBlocklistMeta, FixableBlocklistRule } from '../src/config'
 import { planRewrite } from '../src/core/plan'
 import type { PlanDeps } from '../src/core/plan'
 
@@ -247,5 +249,33 @@ describe('hideFixes', () => {
   it('leaves entries without a fix, and non-array entries, alone', () => {
     const blocklist = ['tab', [/^float-/, { message: 'use flex' }]]
     expect(hideFixes(blocklist)).toEqual(blocklist)
+  })
+
+  /*
+  * The types are the point of these two, not the assertions. A project types
+  * its blocklist as `FixableBlocklistRule[]` and gets `fix` checked where it is
+  * written; `hideFixes` then hands back the `BlocklistRule[]` a UnoCSS config
+  * wants, with no cast at the boundary. Both facts are checked by `tsc`, so a
+  * regression here fails `pnpm typecheck` rather than this expectation.
+  */
+  it('accepts a blocklist typed as FixableBlocklistRule[] and returns BlocklistRule[]', () => {
+    const blocklist: FixableBlocklistRule[] = [
+      'tab',
+      [/^border$/, { message: 'use shorter "b"', fix: () => ['b'] }],
+      [/^opacity-(\d+)$/, { message: 'use "op-*"', fix: (v) => v.replace('opacity-', 'op-') }],
+    ]
+
+    const result: BlocklistRule[] = hideFixes(blocklist)
+
+    expect(result).toHaveLength(3)
+    expect(Object.keys({ ...(result[1] as [unknown, object])[1] })).toEqual(['message'])
+  })
+
+  it('types a fix returning one token and a fix returning several', () => {
+    const meta: FixableBlocklistMeta = { message: 'use "w-* h-*"', fix: (v) => [`w-${v}`, `h-${v}`] }
+    const single: FixableBlocklistMeta = { fix: (v) => v.replace('opacity-', 'op-') }
+
+    expect(meta.fix?.('4')).toEqual(['w-4', 'h-4'])
+    expect(single.fix?.('opacity-50')).toBe('op-50')
   })
 })

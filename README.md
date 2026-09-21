@@ -128,6 +128,32 @@ is an additive convention: `BlocklistMeta` upstream carries only `message`, and
 UnoCSS ignores meta keys it does not recognise, so a config can declare `fix`
 today without waiting for anything to change.
 
+Because the convention is additive, `BlocklistRule` upstream does not know
+about `fix` - a project typing its blocklist against it gets no checking on the
+one part this plugin reads. The same entry point exports the types that do:
+
+```ts
+import { hideFixes } from 'eslint-plugin-unocss-normalize-classes/config'
+import type {
+  FixableBlocklistMeta,
+  FixableBlocklistRule,
+} from 'eslint-plugin-unocss-normalize-classes/config'
+
+const blocklist: FixableBlocklistRule[] = [
+  [/^border$/, { message: 'use shorter "b"', fix: () => ['b'] }],
+]
+
+export default defineConfig({
+  blocklist: hideFixes(blocklist), // BlocklistRule[] - no cast
+})
+```
+
+`FixableBlocklistMeta` extends UnoCSS's `BlocklistMeta`, so anything upstream
+adds to it arrives here too. `hideFixes` returns `BlocklistRule[]` when given
+`FixableBlocklistRule[]`, which is what `defineConfig` wants - the cast a
+project would otherwise write at that boundary is the one place a `fix` typo
+could hide.
+
 #### Telling a colour apart from the rest of `text-*`
 
 `text-*` is three unrelated utilities behind one prefix - a colour
