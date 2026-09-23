@@ -26,6 +26,37 @@ describe('collapsibleShortcuts', () => {
     const sets = collapsibleShortcuts([['small', 'a b'], ['large', 'a b c d']])
     expect(sets.map((set) => set.name)).toEqual(['large', 'small'])
   })
+
+  /*
+  * The marker rides in the third slot UnoCSS already gives a static shortcut,
+  * so it survives `mergeConfigs` and `resolveShortcuts` untouched and the
+  * generator ignores it. Read here rather than filtered here: whether a scoped
+  * set may be used depends on the file being linted, which this function does
+  * not see.
+  */
+  it('reads the scoped marker off the meta slot', () => {
+    const sets = collapsibleShortcuts([
+      ['center', 'items-center justify-center'],
+      ['brand-title', 'fw-bold tracking-wide', { scoped: true }],
+    ])
+
+    expect(sets.map((set) => [set.name, set.scoped])).toEqual([
+      ['center', false],
+      ['brand-title', true],
+    ])
+  })
+
+  it('treats a missing, false, or non-boolean marker as not scoped', () => {
+    const sets = collapsibleShortcuts([
+      ['a', 'x y'],
+      ['b', 'x y', {}],
+      ['c', 'x y', { scoped: false }],
+      ['d', 'x y', { layer: 'components' }],
+      ['e', 'x y', { scoped: 'yes' }],
+    ])
+
+    expect(sets.every((set) => !set.scoped)).toBe(true)
+  })
 })
 
 describe('matchShortcut', () => {

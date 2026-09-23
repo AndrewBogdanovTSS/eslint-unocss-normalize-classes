@@ -1,4 +1,4 @@
-import { hideFixes } from 'eslint-plugin-unocss-normalize-classes/config'
+import { hideFixes, scoped } from 'eslint-plugin-unocss-normalize-classes/config'
 import { defineConfig, presetWind3 } from 'unocss'
 
 /**
@@ -62,6 +62,17 @@ export default defineConfig({
     // Dynamic shortcuts cannot be read backwards, so they must be ignored as a
     // collapse source rather than crashing the scan.
     [/^pill-(\d+)$/, ([, n]: string[]) => `rounded-full px-${n}`],
+
+    // A shortcut whose expansion belongs to one layer. Another layer of this
+    // project defines `brand-title` differently, so collapsing into the name
+    // in shared code would render differently per build - and the prover
+    // cannot see it, because it only ever builds this one config.
+    //
+    // Its tokens are chosen to overlap nothing else here, so what the suite
+    // observes about it is the marker and not a competing match.
+    ...scoped({
+      'brand-title': 'fw-bold tracking-wide',
+    }),
   ],
 
   blocklist: hideFixes([

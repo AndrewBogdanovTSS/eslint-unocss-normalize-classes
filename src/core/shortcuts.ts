@@ -17,6 +17,17 @@ export interface ShortcutSet {
   name: string
   /** The utilities it stands for, variant groups expanded. */
   tokens: string[]
+  /**
+   * The config marked this shortcut `scoped`: its expansion depends on which
+   * layer is merged, so collapsing into the name is only correct in code that
+   * ships with that one layer.
+   *
+   * Optional so a set built by hand - a codemod calling `planRewrite`
+   * directly - needs no answer to a question it does not have.
+   *
+   * @see `ScopedShortcutMeta` in `../config`, and the `scoped` helper beside it.
+   */
+  scoped?: boolean
 }
 
 /**
@@ -27,6 +38,10 @@ export interface ShortcutSet {
  * both are one token is a rename, not a simplification, and the blocklist is
  * where a project says it wants one.
  *
+ * A `scoped` set is returned rather than dropped, because whether it may be
+ * used depends on the file being linted, which this function does not see. The
+ * caller decides; `session.ts` filters.
+ *
  * @param shortcuts - `uno.config.shortcuts`, after UnoCSS has resolved it.
  * @returns Collapsible sets, longest first, so the biggest match wins.
  */
@@ -35,14 +50,14 @@ export function collapsibleShortcuts(shortcuts: readonly unknown[]): ShortcutSet
 
   for (const shortcut of shortcuts) {
     if (!Array.isArray(shortcut)) continue
-    const [name, value] = shortcut as [unknown, unknown]
+    const [name, value, meta] = shortcut as [unknown, unknown, { scoped?: unknown } | undefined]
     if (typeof name !== 'string' || typeof value !== 'string') continue
 
     // A shortcut may itself be written with variant groups
     // (`active:(bg-grey-90 c-grey-10)`); expanded, its tokens line up with the
     // tokens a template actually carries.
     const tokens = parseVariantGroup(value).expanded.trim().split(/\s+/).filter(Boolean)
-    if (tokens.length > 1) sets.push({ name, tokens })
+    if (tokens.length > 1) sets.push({ name, tokens, scoped: meta?.scoped === true })
   }
 
   return sets.sort((a, b) => b.tokens.length - a.tokens.length)

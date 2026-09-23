@@ -142,6 +142,11 @@ ruleTester.run('unocss-normalize/classes', rule, {
       code: '<template><div class="md:b md:op-50" /></template>',
       options: [{ configPath, variantGroups: { minimum: 3 } }],
     },
+    {
+      name: 'a shortcut the config marked scoped, in a file whose layer is unknown',
+      code: '<template><div class="fw-bold tracking-wide" /></template>',
+      options,
+    },
   ],
 
   invalid: [
@@ -170,6 +175,20 @@ ruleTester.run('unocss-normalize/classes', rule, {
       name: 'a shortcut collapse',
       code: '<template><div class="flex justify-center gap-2 items-center" /></template>',
       output: '<template><div class="flex center gap-2" /></template>',
+      options,
+      errors: [{ messageId: 'normalize' }],
+    },
+    {
+      name: 'a scoped shortcut, in a file the config block says ships with that layer',
+      code: '<template><div class="fw-bold tracking-wide" /></template>',
+      output: '<template><div class="brand-title" /></template>',
+      options: [{ configPath, allowScoped: true }],
+      errors: [{ messageId: 'normalize' }],
+    },
+    {
+      name: 'an unmarked shortcut beside a scoped one, with the default options',
+      code: '<template><div class="items-center fw-bold justify-center tracking-wide" /></template>',
+      output: '<template><div class="center fw-bold tracking-wide" /></template>',
       options,
       errors: [{ messageId: 'normalize' }],
     },

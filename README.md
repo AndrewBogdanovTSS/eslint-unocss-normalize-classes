@@ -261,11 +261,96 @@ compute:
 comparison in which `4px` and `0.25rem` are simply different - the honest
 reading for a project whose users change their browser font size.
 
+### Shortcuts that mean different things in different builds
+
+A project that composes its config from layers - a brand, a theme, a
+white-label tenant - can define one shortcut name twice:
+
+```ts
+// brands/timberland/…/typography.ts
+'title-5': 'text-xs fw-bold font-secondary'
+
+// brands/vans/…/typography.ts
+'title-5': 'text-base fw-bold lh-1 font-secondary'
+```
+
+Both are correct where they are. But a component shared by both brands is
+linted against whichever config is on disk, so `--fix` under Timberland
+rewrites `text-xs fw-bold font-secondary` to `title-5`, and the Vans build then
+renders that element at `text-base` with a line height nobody asked for.
+
+**The proof cannot catch this.** It builds one generator from one config, so
+both sides of the comparison come from the same layer and the collapse is
+genuinely equivalent *there*. What the rewrite changes is not the CSS but the
+*meaning*: a fixed set of utilities becomes a lookup whose result differs per
+build. Nothing inside a single config makes that visible.
+
+So the config says it, on the shortcut itself:
+
+```ts
+import { scoped } from 'eslint-plugin-unocss-normalize-classes/config'
+
+// brands/timberland/config/unocss/shortcuts/index.ts
+export default [
+  ...scoped({ ...button, ...typography }),
+] as UserShortcuts
+```
+
+`scoped` moves a shortcut map to the tuple form - the only one with a meta slot
+- and marks each entry. Same additive convention as `fix` on a blocklist entry:
+`RuleMeta` upstream knows nothing about `scoped`, UnoCSS ignores meta keys it
+does not recognise, and the generated CSS is byte for byte what it was.
+
+A marked shortcut is no longer a collapse source. It still generates, still
+works everywhere it is written by hand, and every unmarked shortcut in the
+config keeps collapsing as before.
+
+**Per shortcut, not per config, because a merged config cannot say which is
+which.** After `mergeConfigs` a top-level flag is one scalar with nothing
+tying it to any shortcut, and while the merged `shortcuts` array does keep its
+per-layer segments in order, it does not keep their boundaries. The marker has
+to travel on the shortcut.
+
+#### Turning it back on where the layer is known
+
+Code that only ever ships with one layer - a `brands/vans/**` component, a
+tenant-specific page - should get the collapse, because there the name means
+one thing:
+
+```js
+export default [
+  // shared code: scoped shortcuts are not collapse sources
+  {
+    files: ['**/*.vue'],
+    rules: { 'unocss-normalize/classes': 'error' },
+  },
+
+  // layer-scoped code: the scope is known, so allow them
+  ...['timberland', 'vans'].map((brand) => ({
+    files: [`brands/${brand}/**/*.vue`],
+    rules: {
+      'unocss-normalize/classes': ['error', {
+        configPath: `.nuxt/uno.${brand}.config.mjs`,
+        allowScoped: true,
+      }],
+    },
+  })),
+]
+```
+
+Both blocks can name the same config; the session cache is keyed by config
+alone, and the filter runs per plan.
+
+A scoped shortcut that is skipped is skipped silently - like `shortcuts: false`,
+and unlike a refused rewrite. There is nothing to fix in the config, so there
+is nothing to report.
+
 ## Options
 
 | Option           | Default | What it does                                                                     |
 | ---------------- | ------- | -------------------------------------------------------------------------------- |
 | `shortcuts`      | `true`  | Collapse token sets that a shortcut already names                                  |
+| `allowScoped`    | `false` | Also collapse into shortcuts the config marked `scoped`                            |
 | `blocklist`      | `true`  | Apply the `fix` a blocklist entry declares                                         |
 | `variantGroups`  | `false` | Collapse tokens sharing a variant into a group; `true`, or `{ minimum: n }`        |
 | `reportUnproven` | `true`  | Report a rewrite that was proposed and refused, instead of staying silent          |

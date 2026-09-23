@@ -20,7 +20,13 @@ const basic = fileURLToPath(new URL('./fixtures/basic/uno.config.ts', import.met
 const noFixes = fileURLToPath(new URL('./fixtures/no-fixes/uno.config.ts', import.meta.url))
 const looping = fileURLToPath(new URL('./fixtures/looping/uno.config.ts', import.meta.url))
 
-const DEFAULTS: PlanOptions = { shortcuts: true, blocklist: true, rootFontSize: 16, variantGroups: false }
+const DEFAULTS: PlanOptions = {
+  shortcuts: true,
+  allowScoped: false,
+  blocklist: true,
+  rootFontSize: 16,
+  variantGroups: false,
+}
 
 const plan = async (value: string, options: Partial<PlanOptions> = {}, config = basic) =>
   planForConfig(config, value, undefined, { ...DEFAULTS, ...options })
@@ -306,5 +312,38 @@ describe('separating colours from the rest of text-*', () => {
 
     expect(result.value).toBe('c-red-500 text-sm flex')
     expect(result.unproven).toHaveLength(1)
+  })
+})
+
+/*
+* A name whose expansion depends on which layer is merged.
+*
+* The proof cannot rule these out: it builds one generator from one config, so
+* both sides of the comparison come from the same layer and the collapse is
+* genuinely equivalent *there*. The marker is what carries the other layers'
+* existence into a run that can only see this one.
+*/
+describe('scoped shortcuts', () => {
+  it('is not a collapse source by default', async () => {
+    const result = await plan('fw-bold tracking-wide')
+    expect(result.value).toBe('fw-bold tracking-wide')
+    expect(result.changed).toBe(false)
+  })
+
+  it('collapses once the caller says the file ships with this layer', async () => {
+    const result = await plan('fw-bold tracking-wide', { allowScoped: true })
+    expect(result.value).toBe('brand-title')
+  })
+
+  it('leaves unmarked shortcuts collapsing either way', async () => {
+    for (const allowScoped of [false, true]) {
+      const result = await plan('items-center justify-center', { allowScoped })
+      expect(result.value, `allowScoped: ${allowScoped}`).toBe('center')
+    }
+  })
+
+  it('does not stop the blocklist reaching tokens beside a scoped name', async () => {
+    const result = await plan('border fw-bold tracking-wide')
+    expect(result.value).toBe('b fw-bold tracking-wide')
   })
 })

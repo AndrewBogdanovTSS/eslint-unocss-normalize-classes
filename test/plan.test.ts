@@ -1,6 +1,6 @@
-import type { BlocklistRule } from '@unocss/core'
+import type { BlocklistRule, StaticShortcut, UserShortcuts } from '@unocss/core'
 import { describe, expect, it, vi } from 'vitest'
-import { hideFixes } from '../src/config'
+import { hideFixes, scoped } from '../src/config'
 import type { FixableBlocklistMeta, FixableBlocklistRule } from '../src/config'
 import { planRewrite } from '../src/core/plan'
 import type { PlanDeps } from '../src/core/plan'
@@ -277,5 +277,49 @@ describe('hideFixes', () => {
 
     expect(meta.fix?.('4')).toEqual(['w-4', 'h-4'])
     expect(single.fix?.('opacity-50')).toBe('op-50')
+  })
+})
+
+describe('scoped', () => {
+  it('moves a map to the tuple form and marks every entry', () => {
+    expect(scoped({ 'title-5': 'text-xs fw-bold', 'eyebrow': 'text-xs' })).toEqual([
+      ['title-5', 'text-xs fw-bold', { layer: 'shortcuts', scoped: true }],
+      ['eyebrow', 'text-xs', { layer: 'shortcuts', scoped: true }],
+    ])
+  })
+
+  /*
+  * `stringifyShortcuts` takes its meta as `meta = { layer: shortcutsLayer }` -
+  * a default parameter, so it applies only when a shortcut carries none. Any
+  * meta without a `layer` therefore moves the shortcut's rules out of the
+  * shortcuts layer and into the default one, which sorts after it. That is a
+  * cascade change from a marker that is meant to be inert, and it is invisible
+  * in every assertion about class names, so it is pinned here.
+  */
+  it('restates the shortcuts layer, so marking one changes no CSS', () => {
+    const [, , meta] = scoped({ center: 'items-center justify-center' })[0] as [string, string, object]
+    expect(meta).toHaveProperty('layer', 'shortcuts')
+  })
+
+  it('takes a custom shortcuts layer', () => {
+    const [, , meta] = scoped({ center: 'items-center justify-center' }, { layer: 'ours' })[0] as [string, string, object]
+    expect(meta).toHaveProperty('layer', 'ours')
+  })
+
+  it('returns an empty list for an empty map', () => {
+    expect(scoped({})).toEqual([])
+  })
+
+  /*
+  * The marker is additive: `RuleMeta` upstream knows nothing about `scoped`,
+  * and UnoCSS ignores meta keys it does not recognise. So the tuples this
+  * returns are ordinary `StaticShortcut`s, assignable wherever a config wants
+  * them - checked by `tsc`, so a regression fails `pnpm typecheck`.
+  */
+  it('returns shortcuts a UnoCSS config accepts, with no cast', () => {
+    const shortcuts: StaticShortcut[] = scoped({ 'brand-title': 'fw-bold tracking-wide' })
+    const config: UserShortcuts = [{ center: 'items-center justify-center' }, ...shortcuts]
+
+    expect(config).toHaveLength(2)
   })
 })

@@ -26,6 +26,14 @@ import { joinToken, splitToken } from './core/tokens'
 export interface PlanOptions {
   /** Collapse token sets that a shortcut already names. */
   shortcuts: boolean
+  /**
+   * Also collapse into shortcuts the config marked `scoped`.
+   *
+   * Only correct for a file that ships with the layer defining them - a
+   * brand-scoped component, a tenant-specific page. Shared code linted with
+   * this on gets a rewrite that renders differently in every other build.
+   */
+  allowScoped: boolean
   /** Apply the `fix` a blocklist entry declares. */
   blocklist: boolean
   /** Root font size for comparing `rem` against `px`, or `false` to compare strictly. */
@@ -185,8 +193,16 @@ async function plan(
   const session = await getSession(configPath, id)
   const scope = configPath ?? searchDirectory(id)
 
+  // Filtered here rather than in `createSession`, so the session cache stays
+  // keyed by config alone: one project can lint its shared code and its
+  // layer-scoped code in the same run, against the same config, with different
+  // answers to this question.
+  const usable = options.allowScoped
+    ? session.shortcuts
+    : session.shortcuts.filter((shortcut) => !shortcut.scoped)
+
   return planRewrite(value, {
-    shortcuts: options.shortcuts ? session.shortcuts : [],
+    shortcuts: options.shortcuts ? usable : [],
     variantGroups: options.variantGroups,
     sortKey: async (token) => {
       const key = cacheKey(scope, 'sort', token)

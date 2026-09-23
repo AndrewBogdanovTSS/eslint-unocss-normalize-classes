@@ -6,7 +6,14 @@
  * Nothing here imports anything at runtime - the one import below is a type,
  * erased before any config loads this file.
  */
-import type { BlocklistMeta, BlocklistRule, BlocklistValue } from '@unocss/core'
+import type {
+  BlocklistMeta,
+  BlocklistRule,
+  BlocklistValue,
+  RuleMeta,
+  StaticShortcut,
+  StaticShortcutMap,
+} from '@unocss/core'
 
 /**
  * A blocklist entry's meta, plus the `fix` this plugin reads.
@@ -76,5 +83,86 @@ export function hideFixes(blocklist: readonly unknown[]): unknown[] {
     const { fix, ...rest } = meta
     Object.defineProperty(rest, 'fix', { value: fix, enumerable: false })
     return [pattern, rest]
+  })
+}
+
+/**
+ * A shortcut's meta, plus the `scoped` marker this plugin reads.
+ *
+ * Additive in the same way {@link FixableBlocklistMeta} is: `RuleMeta` upstream
+ * knows nothing about `scoped`, and UnoCSS ignores meta keys it does not
+ * recognise, so marking a shortcut costs nothing at generation time and needs
+ * no change upstream.
+ *
+ * @see {@link scoped} for the helper that applies it.
+ */
+export interface ScopedShortcutMeta extends RuleMeta {
+  /**
+   * The name's expansion depends on which config is merged.
+   *
+   * A project that composes its config from layers - a brand, a theme, a
+   * white-label tenant - can define one name twice. `title-5` is
+   * `text-xs fw-bold` under one layer and `text-base fw-bold lh-1` under
+   * another, and both are correct where they are.
+   *
+   * Collapsing utilities into such a name changes what the attribute *means*:
+   * a fixed set of utilities becomes a lookup whose result differs per build.
+   * The proof cannot catch it, because it builds one generator from one config,
+   * so both sides of the comparison come from the same layer and the rewrite is
+   * genuinely equivalent *there*.
+   *
+   * Marked shortcuts are therefore not collapse sources, unless the rule is
+   * told the file it is linting only ever ships with this layer - see the
+   * `allowScoped` option.
+   */
+  scoped?: boolean
+}
+
+/**
+ * Mark every shortcut in `map` as {@link ScopedShortcutMeta.scoped | scoped}.
+ *
+ * Converts the map form to the tuple form, which is the only one with a meta
+ * slot. Callers keep authoring maps, so whatever type check sits on the source
+ * object still applies:
+ *
+ * ```ts
+ * import { scoped } from 'eslint-plugin-unocss-normalize-classes/config'
+ *
+ * // brands/timberland/config/unocss/shortcuts/index.ts
+ * export default [
+ *   ...scoped({ ...button, ...typography }),
+ * ] as UserShortcuts
+ * ```
+ *
+ * Marking is per shortcut rather than per config on purpose. After
+ * `mergeConfigs` a top-level flag is one scalar with nothing tying it to any
+ * shortcut, and the merged `shortcuts` array keeps its per-layer segments but
+ * not their boundaries - so the marker has to travel on the shortcut itself.
+ *
+ * **The CSS layer has to be restated, which is why `layer` is a parameter.**
+ * `UnoGenerator.stringifyShortcuts` takes its meta as
+ * `meta = { layer: this.config.shortcutsLayer }` - a *default parameter*, so it
+ * applies only when a shortcut carries no meta at all. Attach any meta without
+ * a `layer` and the shortcut's rules stop landing in the shortcuts layer and
+ * fall through to the default one, which sorts after it: a cascade change, from
+ * a marker that is supposed to be inert. `'shortcuts'` is UnoCSS's own default;
+ * pass the value of `shortcutsLayer` if the config sets one.
+ *
+ * @param map - Static shortcuts, as a layer authors them.
+ * @param options - `layer`, when the config sets a custom `shortcutsLayer`.
+ * @returns The same shortcuts as tuples, each carrying `{ scoped: true }`.
+ */
+export function scoped(
+  map: StaticShortcutMap,
+  options: { layer?: string } = {},
+): StaticShortcut[] {
+  // UnoCSS's `LAYER_SHORTCUTS`, inlined: this module is imported by a
+  // `uno.config.ts`, which the build loads too, and it stays import-free.
+  const layer = options.layer ?? 'shortcuts'
+
+  return Object.entries(map).map(([name, value]): StaticShortcut => {
+    const meta: ScopedShortcutMeta = { layer, scoped: true }
+
+    return [name, value, meta]
   })
 }

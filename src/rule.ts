@@ -25,6 +25,7 @@ const syncPlan = createSyncFn<(...request: PlanRequest) => Promise<PlanResult>>(
 
 interface RuleOptions {
   shortcuts?: boolean
+  allowScoped?: boolean
   blocklist?: boolean
   variantGroups?: boolean | { minimum: number }
   reportUnproven?: boolean
@@ -34,6 +35,10 @@ interface RuleOptions {
 
 const DEFAULTS: Required<Omit<RuleOptions, 'configPath'>> = {
   shortcuts: true,
+  // Off by default: the safe answer for a file whose layer is unknown, which
+  // is every file until a config block says otherwise. Scope a `files:` block
+  // to the layer's own directory and turn it on there.
+  allowScoped: false,
   blocklist: true,
   // Off by default: the grouped syntax only works when the build runs
   // `transformerVariantGroup`, and this rule cannot see a transformer that a
@@ -72,6 +77,7 @@ const rule: Rule.RuleModule = {
       type: 'object',
       properties: {
         shortcuts: { type: 'boolean' },
+        allowScoped: { type: 'boolean' },
         blocklist: { type: 'boolean' },
         variantGroups: {
           anyOf: [
@@ -119,6 +125,7 @@ const rule: Rule.RuleModule = {
 
     const planOptions: PlanOptions = {
       shortcuts: options.shortcuts,
+      allowScoped: options.allowScoped,
       blocklist: options.blocklist,
       rootFontSize: options.rootFontSize,
       variantGroups,
