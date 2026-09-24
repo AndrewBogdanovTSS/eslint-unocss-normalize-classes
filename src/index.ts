@@ -13,7 +13,10 @@
  * `fixable: 'code'` and never emits a fix - could adopt them without taking
  * this package as a dependency.
  */
+import type { ESLint, Linter } from 'eslint'
 import classes from './rule'
+import type { ThemedConfigsOptions } from './themes'
+import { buildThemedConfigs } from './themes'
 
 declare const __PLUGIN_VERSION__: string
 
@@ -25,8 +28,10 @@ export { applyShortcut, collapsibleShortcuts, matchShortcut } from './core/short
 export type { ShortcutMatch, ShortcutSet } from './core/shortcuts'
 export { joinToken, lastVariantSeparator, splitClassValue, splitToken } from './core/tokens'
 export type { SplitToken } from './core/tokens'
+export type { RuleOptions } from './rule'
 export type { PlanOptions, PlanRequest } from './session'
 export { planForConfig } from './session'
+export type { ThemedConfigsOptions } from './themes'
 export { classes }
 
 const plugin = {
@@ -49,5 +54,30 @@ plugin.configs.recommended = [{
   plugins: { 'unocss-normalize': plugin },
   rules: { 'unocss-normalize/classes': 'error' },
 }]
+
+/**
+ * Flat-config blocks that lint each theme's directory against that theme's
+ * own UnoCSS config, with `allowScoped` on.
+ *
+ * The consuming half of `eslint-plugin-unocss-normalize-classes/nuxt`: that
+ * module writes `<buildDir>/uno/config/<theme>.mjs`, and this reads them. Pass
+ * the same `themes` map to both, and spread the result after the project-wide
+ * entry so its blocks win for the files they match.
+ *
+ * ```js
+ * import unocssNormalize, { themedConfigs } from 'eslint-plugin-unocss-normalize-classes'
+ *
+ * export default [
+ *   ...unocssNormalize.configs.recommended,
+ *   ...themedConfigs({ themes: { dark: 'themes/dark', light: 'themes/light' } }),
+ * ]
+ * ```
+ *
+ * @param options - See {@link ThemedConfigsOptions}.
+ * @returns One block per theme whose config is on disk.
+ */
+export function themedConfigs(options: ThemedConfigsOptions): Linter.Config[] {
+  return buildThemedConfigs(plugin as unknown as ESLint.Plugin, options)
+}
 
 export default plugin

@@ -23,7 +23,7 @@ import type { PlanOptions, PlanRequest } from './session'
 const workerPath = fileURLToPath(new URL('../dist/worker.mjs', import.meta.url))
 const syncPlan = createSyncFn<(...request: PlanRequest) => Promise<PlanResult>>(workerPath)
 
-interface RuleOptions {
+export interface RuleOptions {
   shortcuts?: boolean
   allowScoped?: boolean
   blocklist?: boolean

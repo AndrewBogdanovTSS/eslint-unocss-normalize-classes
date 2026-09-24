@@ -21,6 +21,9 @@ export default defineConfig({
     // Importable from a `uno.config.ts`, which the build loads too - so it
     // must not drag in the rule, whose module scope starts a worker.
     config: 'src/config.ts',
+    // A Nuxt module. Its own entry so `@nuxt/kit` - an optional peer - is only
+    // ever imported by a project that registers the module.
+    nuxt: 'src/nuxt.ts',
     worker: 'src/worker.ts',
   },
   format: ['esm'],

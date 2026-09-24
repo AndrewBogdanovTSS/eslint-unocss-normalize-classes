@@ -13,7 +13,10 @@
     "autofix",
     "codemod",
     "shortcuts",
-    "blocklist"
+    "blocklist",
+    "nuxt",
+    "nuxt-module",
+    "themes"
   ],
   "license": "MIT",
   "author": "Andrii Bohdanov",
@@ -39,6 +42,10 @@
     "./config": {
       "types": "./dist/config.d.mts",
       "import": "./dist/config.mjs"
+    },
+    "./nuxt": {
+      "types": "./dist/nuxt.d.mts",
+      "import": "./dist/nuxt.mjs"
     },
     "./worker": "./dist/worker.mjs",
     "./package.json": "./package.json"
@@ -68,7 +75,17 @@
     "provenance": true
   },
   "peerDependencies": {
+    "@nuxt/kit": "^3.17.0 || ^4.0.0",
+    "@nuxt/schema": "^3.17.0 || ^4.0.0",
     "eslint": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    },
+    "@nuxt/schema": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@unocss/config": "^66.6.8",
@@ -77,6 +94,8 @@
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
+    "@nuxt/kit": "^4.5.2",
+    "@nuxt/schema": "^4.5.2",
     "@types/node": "^26.6.1",
     "@unocss/eslint-config": "^66.10.5",
     "eslint": "^10.10.0",

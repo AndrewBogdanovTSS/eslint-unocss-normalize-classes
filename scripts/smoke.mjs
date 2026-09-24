@@ -61,6 +61,59 @@ check('the config subpath imports without starting a worker', async () => {
   assert.deepEqual(Object.keys({ ...meta }), ['message'], 'no function may survive a spread')
 })
 
+/**
+ * The bare specifiers a built file reaches, following its relative imports
+ * through the chunks the bundler split out. Parsed from `import … from` rather
+ * than grepped for, because a comment that mentions a package is not an import.
+ */
+function reachableSpecifiers(entry) {
+  const seen = new Set()
+  const specifiers = new Set()
+  const visit = (file) => {
+    if (seen.has(file)) return
+    seen.add(file)
+    for (const [, specifier] of readFileSync(file, 'utf8').matchAll(/^import\s[^;]*?from\s+"([^"]+)"/gm)) {
+      if (specifier.startsWith('.')) visit(join(dirname(file), specifier))
+      else specifiers.add(specifier)
+    }
+  }
+  visit(join(root, 'dist', entry))
+  return specifiers
+}
+
+check('only the nuxt subpath reaches @nuxt/kit, an optional peer', () => {
+  for (const entry of ['index.mjs', 'config.mjs', 'worker.mjs']) {
+    const reached = [...reachableSpecifiers(entry)].filter((specifier) => specifier.startsWith('@nuxt/'))
+    assert.deepEqual(reached, [], entry + ' would fail to load in a project without Nuxt')
+  }
+  assert.ok(reachableSpecifiers('nuxt.mjs').has('@nuxt/kit'), 'the nuxt subpath no longer imports @nuxt/kit')
+})
+
+check('the nuxt subpath exports a Nuxt module', async () => {
+  const module = (await import(pathToFileURL(join(root, 'dist', 'nuxt.mjs')).href)).default
+  const meta = await module.getMeta()
+  assert.equal(meta.name, 'uno-themed-configs')
+  assert.equal(meta.configKey, 'unoThemedConfigs')
+})
+
+check('themedConfigs reads what the nuxt subpath writes', async () => {
+  const { themedConfigs } = await import(pathToFileURL(join(root, 'dist', 'index.mjs')).href)
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+
+  const project = mkdtempSync(join(tmpdir(), 'smoke-themed-'))
+  try {
+    mkdirSync(join(project, '.nuxt', 'uno', 'config'), { recursive: true })
+    writeFileSync(join(project, '.nuxt', 'uno', 'config', 'dark.mjs'), '')
+
+    const blocks = themedConfigs({ themes: { dark: 'themes/dark', light: 'themes/light' }, rootDir: project })
+    assert.deepEqual(blocks.map((block) => block.files), [['themes/dark/**/*.vue']])
+    assert.equal(blocks[0].plugins['unocss-normalize'], plugin, 'a second plugin object would clash in ESLint')
+  } finally {
+    rmSync(project, { recursive: true, force: true })
+  }
+})
+
 check('the plugin reports the version package.json declares', () => {
   assert.equal(plugin.meta.version, pkg.version)
 })

@@ -313,33 +313,75 @@ to travel on the shortcut.
 
 #### Turning it back on where the layer is known
 
-Code that only ever ships with one layer - a `brands/vans/**` component, a
+Code that only ever ships with one layer - a `themes/dark/**` component, a
 tenant-specific page - should get the collapse, because there the name means
-one thing:
+one thing. `allowScoped` says so, on a block scoped to that layer's files and
+pointed at that layer's config:
 
 ```js
-export default [
-  // shared code: scoped shortcuts are not collapse sources
-  {
-    files: ['**/*.vue'],
-    rules: { 'unocss-normalize/classes': 'error' },
+{
+  files: ['themes/dark/**/*.vue'],
+  rules: {
+    'unocss-normalize/classes': ['error', { configPath: 'dark.uno.config.ts', allowScoped: true }],
   },
+}
+```
 
-  // layer-scoped code: the scope is known, so allow them
-  ...['timberland', 'vans'].map((brand) => ({
-    files: [`brands/${brand}/**/*.vue`],
-    rules: {
-      'unocss-normalize/classes': ['error', {
-        configPath: `.nuxt/uno.${brand}.config.mjs`,
-        allowScoped: true,
-      }],
-    },
-  })),
+That is one block per layer, each needing a config that merges the shared
+layers with that layer's own. A Nuxt project gets both from this package.
+
+##### In a Nuxt project
+
+The `/nuxt` subpath is a Nuxt module that writes one merged config per theme,
+and `themedConfigs()` turns the same map into the blocks above:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['@unocss/nuxt', 'eslint-plugin-unocss-normalize-classes/nuxt'],
+  unocss: { nuxtLayers: true },
+  unoThemedConfigs: {
+    // each theme, and the directory holding its layers
+    themes: { dark: 'themes/dark', light: 'themes/light' },
+    // directories whose layers every theme merges beneath its own
+    shared: ['layers'],
+  },
+})
+```
+
+```js
+// eslint.config.js
+import unocssNormalize, { themedConfigs } from 'eslint-plugin-unocss-normalize-classes'
+
+export default [
+  ...unocssNormalize.configs.recommended,
+  // after the project-wide entry, so these win for the files they match
+  ...themedConfigs({ themes: { dark: 'themes/dark', light: 'themes/light' } }),
 ]
 ```
 
-Both blocks can name the same config; the session cache is keyed by config
-alone, and the filter runs per plan.
+- **What gets written:** `.nuxt/uno/config/<theme>.mjs`, as Nuxt templates -
+  rewritten by every `prepare`, `dev` and `build`. They are templates rather
+  than files a script drops in, because `nuxi prepare` deletes build-directory
+  files it did not write itself.
+- **Which layers:** the shared ones are found exactly the way `@unocss/nuxt`
+  finds layers for its own `uno.config.mjs`, so the active theme's file matches
+  that one layer for layer. Anything outside `shared` - the active theme, or a
+  layer only one command switches on - stays out, so the files never depend on
+  which command ran last.
+- **`themedConfigs` options:** `rootDir` (default `process.cwd()`), `buildDir`
+  (default `.nuxt`), `severity` (default `'error'`), and `ruleOptions`. The
+  last one matters: a later flat-config block replaces a rule's options
+  wholesale, so anything the project-wide entry sets has to be repeated there.
+- **Before the first `prepare`:** a theme whose file is not on disk gets no
+  block, so a fresh checkout lints with the project-wide entry rather than
+  failing to load a config.
+- **Versions:** Nuxt 3.17 and newer, including 4. `@nuxt/kit` and
+  `@nuxt/schema` are optional peers - the ESLint plugin on its own installs
+  nothing from Nuxt.
+
+A project-wide block and a theme block may name the same config: the session
+cache is keyed by config alone, and `allowScoped` is applied per plan.
 
 A scoped shortcut that is skipped is skipped silently - like `shortcuts: false`,
 and unlike a refused rewrite. There is nothing to fix in the config, so there
