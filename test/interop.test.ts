@@ -169,6 +169,54 @@ describe('sorting and normalising the same attribute', () => {
   })
 })
 
+/*
+* Which rule's fix lands first, when both want the same attribute in one pass.
+*
+* ESLint applies one fix per range per pass and takes the lowest start first,
+* so if this rule's fix began on the opening quote - one character before the
+* sorter's - it would win every such pass whatever the config said. Both fixes
+* cover the text between the quotes instead, and with equal ranges ESLint keeps
+* the order it collected them in: the order the rules are configured. A project
+* that wants to sort before normalising lists `unocss/order` first.
+*/
+describe('which fix lands first', () => {
+  const code = '<template><div class="justify-center items-center flex gap-2" /></template>'
+  const SORT_FIRST: Linter.RulesRecord = {
+    'unocss/order': 'error',
+    'unocss-normalize/classes': ['error', { configPath }],
+  }
+
+  it('both rules replace the same range - the text between the quotes', async () => {
+    const messages = await report(code, SORT_FIRST)
+    const ranges = messages.map((message) => message.fix?.range)
+
+    expect(messages.map((message) => message.ruleId)).toEqual(['unocss/order', 'unocss-normalize/classes'])
+    expect(ranges[0]).toEqual(ranges[1])
+    expect(code.slice(...ranges[0]!)).toBe('justify-center items-center flex gap-2')
+  })
+
+  it('follows the configured order, so either rule can be made to go first', async () => {
+    const sortFirst = await report(code, SORT_FIRST)
+    const normaliseFirst = await report(code, BOTH)
+
+    expect(sortFirst.map((message) => message.ruleId)).toEqual(['unocss/order', 'unocss-normalize/classes'])
+    expect(normaliseFirst.map((message) => message.ruleId)).toEqual(['unocss-normalize/classes', 'unocss/order'])
+  })
+
+  it('settles on the same result whichever goes first', async () => {
+    const sortFirst = await fixUntilStable(code, SORT_FIRST)
+    const normaliseFirst = await fixUntilStable(code, BOTH)
+
+    expect(sortFirst.output).toBe(normaliseFirst.output)
+    expect(sortFirst.stable && normaliseFirst.stable).toBe(true)
+  })
+
+  it('still adds quotes to an unquoted value, which a class list with spaces needs', async () => {
+    const result = await lint('<template><div class=opacity-50 /></template>', { 'unocss-normalize/classes': ['error', { configPath }] })
+    expect(result.output).toBe('<template><div class="op-50" /></template>')
+  })
+})
+
 describe('what the sorter does to layout', () => {
   const multiLine = '<template>\n  <div\n    class="\n      opacity-50\n      border\n      flex\n    "\n  />\n</template>'
 

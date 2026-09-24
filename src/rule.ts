@@ -149,13 +149,22 @@ const rule: Rule.RuleModule = {
         const node = attribute.value as unknown as Rule.Node
 
         if (plan.changed) {
-          const raw = sourceCode.getText(node)
-          const quote = QUOTES.includes(raw[0]) ? raw[0] : '"'
+          const quoted = QUOTES.includes(sourceCode.getText(node)[0])
           context.report({
             node,
             messageId: 'normalize',
             data: { before, after: plan.value },
-            fix: (fixer) => fixer.replaceText(node, `${quote}${plan.value}${quote}`),
+            // Between the quotes, not over them: the same range `unocss/order`
+            // replaces. ESLint applies one fix per range per pass, taking the
+            // lowest start first - so if this one began on the quote it would
+            // always beat the sorter. With equal ranges ESLint falls back to
+            // the order the rules are configured in, which a project controls.
+            // An unquoted value has to gain quotes, so it is replaced whole.
+            fix: (fixer) => {
+              if (!quoted) return fixer.replaceText(node, `"${plan.value}"`)
+              const [start, end] = sourceCode.getRange(node)
+              return fixer.replaceTextRange([start + 1, end - 1], plan.value)
+            },
           })
         }
 

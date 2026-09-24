@@ -417,8 +417,9 @@ rules: {
 
 **This rule unblocks the sorter.** `unocss/order` sorts by asking the generator
 to parse each token, and a token your blocklist blocks does not parse - so the
-sorter leaves it exactly where it is. On a file written in the spellings your
-config rejects, sorting does almost nothing:
+sorter cannot place it among the others, and moves it to the front with every
+other token it could not parse, in the order they were written. On a file
+written in the spellings your config rejects, sorting does almost nothing:
 
 ```
 class="opacity-50 border flex"
@@ -432,6 +433,25 @@ Configure them in the same run rather than one after the other. ESLint re-runs
 every rule after each fix pass, so the pair converges; a whole run of one piped
 into a whole run of the other does not, because the sorter has already had its
 turn before the tokens became sortable.
+
+**Which one goes first is up to the config.** When both rules want the same
+attribute in one pass, only one fix can land - they rewrite the same text. Both
+replace exactly the text between the quotes, and for fixes over the same range
+ESLint keeps the order the rules are configured in. List `unocss/order` first,
+as above, to sort before normalising:
+
+```
+class="justify-center items-center flex gap-2"
+
+  unocss/order listed first   pass 1   flex items-center justify-center gap-2   sorted
+                              pass 2   flex center gap-2                        normalised
+
+  this rule listed first      pass 1   center flex gap-2                        normalised
+                              pass 2   flex center gap-2                        sorted
+```
+
+The result is the same either way: ESLint keeps making passes until neither
+rule has anything left, so the sorter always has the last word.
 
 One caveat worth knowing: `unocss/order` rewrites a class attribute onto a
 single line, including when the tokens are already in order. With it enabled, a
