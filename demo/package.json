@@ -5,9 +5,12 @@
   "description": "A Nuxt 4 app for trying eslint-plugin-unocss-normalize-classes without installing it anywhere.",
   "scripts": {
     "dev": "nuxt dev",
+    "dev:forest": "nuxt dev --dotenv .env.forest",
     "build": "nuxt build",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "build:forest": "nuxt build --dotenv .env.forest",
+    "lint": "nuxt prepare && eslint .",
+    "lint:forest": "nuxt prepare --dotenv .env.forest && eslint .",
+    "lint:fix": "nuxt prepare && eslint . --fix"
   },
   "dependencies": {
     "nuxt": "^4.5.2",

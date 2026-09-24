@@ -502,7 +502,14 @@ pnpm demo:lint
 Two cards with the same design, one written in the spellings the demo's
 blocklist rejects. `pnpm --dir demo lint:fix` rewrites it and the page renders
 identically - except for one deliberately wrong fix, which the plugin reports
-instead of applying. See [demo/README.md](demo/README.md).
+instead of applying.
+
+The app is also built as one of two themes, picked by `THEME` at build time,
+that define the same shortcut names with different utilities. It shows
+`scoped` shortcuts and the `/nuxt` module end to end: each theme's files
+collapse into that theme's shortcuts, a shared file that happens to spell one
+theme's shortcut is left alone, and the lint result is the same whichever theme
+was prepared. See [demo/README.md](demo/README.md).
 
 The demo is its own workspace root, so it never enters this package's install
 or its CI.
