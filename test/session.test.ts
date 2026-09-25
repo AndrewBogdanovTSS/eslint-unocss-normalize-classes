@@ -347,3 +347,44 @@ describe('scoped shortcuts', () => {
     expect(result.value).toBe('b fw-bold tracking-wide')
   })
 })
+
+/*
+* Manual shortcuts: suggested, never written.
+*
+* `classes` plans without them; `manual-shortcuts` plans with them and nothing
+* else. Where a manual shortcut may be suggested follows the same rule as where
+* any shortcut may be written - a scoped one only with `allowScoped`.
+*/
+describe('manual shortcuts', () => {
+  const suggest = (value: string, options: Partial<PlanOptions> = {}) =>
+    plan(value, { ...options, suggestManual: true })
+
+  it('are never written by the ordinary plan, scoped or not', async () => {
+    for (const allowScoped of [false, true]) {
+      expect((await plan('ring-2 ring-offset-2', { allowScoped })).changed, `allowScoped: ${allowScoped}`).toBe(false)
+      expect((await plan('shadow-md tracking-tight', { allowScoped })).changed, `allowScoped: ${allowScoped}`).toBe(false)
+    }
+  })
+
+  it('are suggested where they would otherwise have been usable', async () => {
+    expect((await suggest('ring-2 ring-offset-2')).value).toBe('halo')
+    expect((await suggest('ring-2 ring-offset-2', { allowScoped: true })).value).toBe('halo')
+    expect((await suggest('shadow-md tracking-tight', { allowScoped: true })).value).toBe('brand-button')
+  })
+
+  it('keep a scoped one out of shared code, where no collapse would be right', async () => {
+    expect((await suggest('shadow-md tracking-tight')).changed).toBe(false)
+  })
+
+  it('suggest only the manual collapse - the blocklist and other shortcuts stand aside', async () => {
+    // `border` has a declared fix and `items-center justify-center` is `center`;
+    // both are the ordinary plan's business, and appear in its own report.
+    const result = await suggest('border ring-2 ring-offset-2 items-center justify-center')
+    expect(result.value).toBe('border halo items-center justify-center')
+  })
+
+  it('are proved like any other collapse, so a suggestion never changes the CSS', async () => {
+    const result = await suggest('ring-2 ring-offset-2')
+    expect(result.unproven).toEqual([])
+  })
+})

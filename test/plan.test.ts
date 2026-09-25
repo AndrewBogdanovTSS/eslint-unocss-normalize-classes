@@ -310,6 +310,16 @@ describe('scoped', () => {
     expect(scoped({})).toEqual([])
   })
 
+  it('marks shortcuts manual when asked, and leaves the key out otherwise', () => {
+    const [[, , manual]] = scoped({ 'vf-button-xs': 'p-2 text-sm lh-1' }, { manual: true }) as [[string, string, object]]
+    const [[, , plain]] = scoped({ 'title-5': 'text-xs fw-bold' }) as [[string, string, object]]
+
+    expect(manual).toEqual({ layer: 'shortcuts', scoped: true, manual: true })
+    // Absent rather than false, so a meta that was never marked looks exactly
+    // as it did before the option existed.
+    expect(plain).not.toHaveProperty('manual')
+  })
+
   /*
   * The marker is additive: `RuleMeta` upstream knows nothing about `scoped`,
   * and UnoCSS ignores meta keys it does not recognise. So the tuples this

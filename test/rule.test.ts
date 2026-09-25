@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { RuleTester } from 'eslint'
 import * as vueParser from 'vue-eslint-parser'
 import { describe, it } from 'vitest'
-import rule from '../src/rule'
+import rule, { manualShortcuts } from '../src/rule'
 import { assertWorkerIsCurrent } from './helpers/worker-is-current'
 
 assertWorkerIsCurrent()
@@ -141,6 +141,16 @@ ruleTester.run('unocss-normalize/classes', rule, {
       name: 'a pair below the configured minimum',
       code: '<template><div class="md:b md:op-50" /></template>',
       options: [{ configPath, variantGroups: { minimum: 3 } }],
+    },
+    {
+      name: 'a shortcut the config marked manual - that one is only ever suggested',
+      code: '<template><div class="ring-2 ring-offset-2" /></template>',
+      options,
+    },
+    {
+      name: 'a scoped manual shortcut, even where scoped ones are allowed',
+      code: '<template><div class="shadow-md tracking-tight" /></template>',
+      options: [{ configPath, allowScoped: true }],
     },
     {
       name: 'a shortcut the config marked scoped, in a file whose layer is unknown',
@@ -336,6 +346,92 @@ ruleTester.run('unocss-normalize/classes', rule, {
       output: '<template><div class="center" /></template>',
       options: [{ configPath: noFixesConfigPath }],
       errors: [{ messageId: 'normalize' }],
+    },
+  ],
+})
+
+/*
+* `unocss-normalize/manual-shortcuts` - what `classes` declines because the
+* config marked the shortcut `manual`, reported with the rewrite as an editor
+* suggestion. Never a fix: RuleTester fails a case whose code the rule changed
+* without an `output`, so every invalid case here also proves `--fix` leaves the
+* file alone.
+*/
+ruleTester.run('unocss-normalize/manual-shortcuts', manualShortcuts, {
+  valid: [
+    {
+      name: 'a class list that spells no manual shortcut',
+      code: '<template><div class="flex gap-2" /></template>',
+      options,
+    },
+    {
+      name: 'an ordinary shortcut, which is `classes` business',
+      code: '<template><div class="items-center justify-center" /></template>',
+      options,
+    },
+    {
+      name: 'a scoped manual shortcut in a file whose layer is unknown',
+      code: '<template><div class="shadow-md tracking-tight" /></template>',
+      options,
+    },
+    {
+      name: 'half of a manual shortcut',
+      code: '<template><div class="ring-2" /></template>',
+      options,
+    },
+    {
+      name: 'a dynamic binding',
+      code: `<template><div :class="'ring-2 ring-offset-2'" /></template>`,
+      options,
+    },
+  ],
+
+  invalid: [
+    {
+      name: 'an unscoped manual shortcut, suggested anywhere',
+      code: '<template><div class="ring-2 ring-offset-2 flex" /></template>',
+      options,
+      errors: [{
+        messageId: 'manual',
+        data: {
+          before: 'ring-2 ring-offset-2 flex',
+          after: 'halo flex',
+          names: '"halo"',
+          verb: 'is',
+        },
+        suggestions: [{
+          messageId: 'apply',
+          data: { after: 'halo flex' },
+          output: '<template><div class="halo flex" /></template>',
+        }],
+      }],
+    },
+    {
+      name: `a scoped manual shortcut, where the file's layer is known`,
+      code: '<template><div class="shadow-md tracking-tight" /></template>',
+      options: [{ configPath, allowScoped: true }],
+      errors: [{
+        messageId: 'manual',
+        suggestions: [{ messageId: 'apply', output: '<template><div class="brand-button" /></template>' }],
+      }],
+    },
+    {
+      name: 'only the manual collapse, beside tokens `classes` would fix',
+      code: '<template><div class="border ring-2 ring-offset-2" /></template>',
+      options,
+      errors: [{
+        messageId: 'manual',
+        suggestions: [{ messageId: 'apply', output: '<template><div class="border halo" /></template>' }],
+      }],
+    },
+    {
+      name: 'the quotes an attribute already uses',
+      code: `<template><div class='ring-2 ring-offset-2' /></template>`,
+      options,
+      errors: [{
+        messageId: 'manual',
+        suggestions: [{ messageId: 'apply', output: `<template><div class='halo' /></template>` }],
+      }],
     },
   ],
 })

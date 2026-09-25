@@ -64,6 +64,67 @@ interface VueParserServices {
 
 const QUOTES = ['"', '\'']
 
+/**
+ * Hand every static `class` attribute in a Vue template to `onValue`.
+ *
+ * Shared by both rules, so they agree on what counts as a class list: a plain
+ * `class` attribute with a literal value. A `:class` binding is a JavaScript
+ * expression, and neither rule guesses at it.
+ */
+function classAttributes(
+  context: Rule.RuleContext,
+  onValue: (node: Rule.Node, value: string) => void,
+): Rule.RuleListener {
+  const parserServices = context.sourceCode.parserServices as unknown as Partial<VueParserServices>
+  // Not a Vue file: `class` here is a plain attribute in some other language
+  // and the rules have nothing to say about it.
+  if (!parserServices.defineTemplateBodyVisitor) return {}
+
+  return parserServices.defineTemplateBodyVisitor({
+    VAttribute(attribute: VueTemplateNode) {
+      if (attribute.directive || attribute.key.name !== 'class') return
+      if (!attribute.value || attribute.value.type !== 'VLiteral') return
+      if (!attribute.value.value.trim()) return
+
+      onValue(attribute.value as unknown as Rule.Node, attribute.value.value)
+    },
+  })
+}
+
+/**
+ * Rewrite a class attribute's value.
+ *
+ * Between the quotes, not over them: the same range `unocss/order` replaces.
+ * ESLint applies one fix per range per pass, taking the lowest start first -
+ * so a fix that began on the quote would always beat the sorter. With equal
+ * ranges ESLint falls back to the order the rules are configured in, which a
+ * project controls. An unquoted value has to gain quotes, so it is replaced
+ * whole.
+ */
+function replaceValue(fixer: Rule.RuleFixer, context: Rule.RuleContext, node: Rule.Node, value: string): Rule.Fix {
+  const { sourceCode } = context
+  if (!QUOTES.includes(sourceCode.getText(node)[0])) return fixer.replaceText(node, `"${value}"`)
+
+  const [start, end] = sourceCode.getRange(node)
+  return fixer.replaceTextRange([start + 1, end - 1], value)
+}
+
+/** The rule's own option first, then the setting `@unocss/eslint-plugin` reads. */
+function resolveConfigPath(context: Rule.RuleContext, configPath: string | undefined): string | undefined {
+  const settings = context.settings as { unocss?: { configPath?: string } }
+  return configPath ?? settings.unocss?.configPath
+}
+
+// ESLint validates rule schemas against JSON Schema draft-04, where
+// `exclusiveMinimum` is a boolean modifier on `minimum` rather than a number
+// of its own.
+const rootFontSizeSchema = {
+  anyOf: [
+    { type: 'number', minimum: 0, exclusiveMinimum: true },
+    { type: 'boolean', enum: [false] },
+  ],
+}
+
 const rule: Rule.RuleModule = {
   meta: {
     type: 'problem',
@@ -90,15 +151,7 @@ const rule: Rule.RuleModule = {
           ],
         },
         reportUnproven: { type: 'boolean' },
-        // ESLint validates rule schemas against JSON Schema draft-04, where
-        // `exclusiveMinimum` is a boolean modifier on `minimum` rather than a
-        // number of its own.
-        rootFontSize: {
-          anyOf: [
-            { type: 'number', minimum: 0, exclusiveMinimum: true },
-            { type: 'boolean', enum: [false] },
-          ],
-        },
+        rootFontSize: rootFontSizeSchema,
         configPath: { type: 'string' },
       },
       additionalProperties: false,
@@ -116,8 +169,7 @@ const rule: Rule.RuleModule = {
 
   create(context) {
     const options = { ...DEFAULTS, ...(context.options[0] ?? {}) } as Required<RuleOptions>
-    const settings = context.settings as { unocss?: { configPath?: string } }
-    const configPath = options.configPath ?? settings.unocss?.configPath
+    const configPath = resolveConfigPath(context, options.configPath)
 
     // `true` is the shorthand for the ordinary case: group a prefix as soon as
     // two tokens share it.
@@ -131,54 +183,118 @@ const rule: Rule.RuleModule = {
       variantGroups,
     }
 
-    const sourceCode = context.sourceCode
-    const parserServices = sourceCode.parserServices as unknown as Partial<VueParserServices>
-    // Not a Vue file: `class` here is a plain attribute in some other language
-    // and the rule has nothing to say about it.
-    if (!parserServices.defineTemplateBodyVisitor) return {}
+    return classAttributes(context, (node, before) => {
+      const plan = syncPlan(configPath, before, context.filename, planOptions)
 
-    return parserServices.defineTemplateBodyVisitor({
-      VAttribute(attribute: VueTemplateNode) {
-        if (attribute.directive || attribute.key.name !== 'class') return
-        if (!attribute.value || attribute.value.type !== 'VLiteral') return
+      if (plan.changed) {
+        context.report({
+          node,
+          messageId: 'normalize',
+          data: { before, after: plan.value },
+          fix: (fixer) => replaceValue(fixer, context, node, plan.value),
+        })
+      }
 
-        const before = attribute.value.value
-        if (!before.trim()) return
-
-        const plan = syncPlan(configPath, before, context.filename, planOptions)
-        const node = attribute.value as unknown as Rule.Node
-
-        if (plan.changed) {
-          const quoted = QUOTES.includes(sourceCode.getText(node)[0])
-          context.report({
-            node,
-            messageId: 'normalize',
-            data: { before, after: plan.value },
-            // Between the quotes, not over them: the same range `unocss/order`
-            // replaces. ESLint applies one fix per range per pass, taking the
-            // lowest start first - so if this one began on the quote it would
-            // always beat the sorter. With equal ranges ESLint falls back to
-            // the order the rules are configured in, which a project controls.
-            // An unquoted value has to gain quotes, so it is replaced whole.
-            fix: (fixer) => {
-              if (!quoted) return fixer.replaceText(node, `"${plan.value}"`)
-              const [start, end] = sourceCode.getRange(node)
-              return fixer.replaceTextRange([start + 1, end - 1], plan.value)
-            },
-          })
-        }
-
-        if (!options.reportUnproven) return
-        for (const refused of plan.unproven) {
-          context.report({
-            node,
-            messageId: 'unproven',
-            data: { before: refused.before, after: refused.after, source: refused.source },
-          })
-        }
-      },
+      if (!options.reportUnproven) return
+      for (const refused of plan.unproven) {
+        context.report({
+          node,
+          messageId: 'unproven',
+          data: { before: refused.before, after: refused.after, source: refused.source },
+        })
+      }
     })
   },
 }
 
 export default rule
+
+export interface ManualShortcutsOptions {
+  allowScoped?: boolean
+  rootFontSize?: number | false
+  configPath?: string
+}
+
+const MANUAL_DEFAULTS: Required<Omit<ManualShortcutsOptions, 'configPath'>> = {
+  // Off by default for the same reason as in `classes`: a scoped manual
+  // shortcut is only ever suggested where the file's layer is known.
+  allowScoped: false,
+  rootFontSize: 16,
+}
+
+/**
+ * `unocss-normalize/manual-shortcuts` - the collapses `classes` declines
+ * because the config marked the shortcut `manual`, reported for a human.
+ *
+ * A rule of its own so it can carry its own severity. ESLint gives a rule one
+ * severity for everything it reports, and a question for a reviewer is not the
+ * same kind of finding as a rewrite that was proved and can be applied. The
+ * rewrite is offered as a suggestion - one click in an editor - and never as a
+ * fix, so `--fix` leaves it alone.
+ */
+export const manualShortcuts: Rule.RuleModule = {
+  meta: {
+    type: 'suggestion',
+    hasSuggestions: true,
+    docs: {
+      description:
+        'Report class lists that spell a shortcut marked manual, offering the proved rewrite as a suggestion rather than a fix',
+      url: 'https://github.com/AndrewBogdanovTSS/eslint-unocss-normalize-classes#readme',
+    },
+    schema: [{
+      type: 'object',
+      properties: {
+        allowScoped: { type: 'boolean' },
+        rootFontSize: rootFontSizeSchema,
+        configPath: { type: 'string' },
+      },
+      additionalProperties: false,
+    }],
+    defaultOptions: [MANUAL_DEFAULTS],
+    messages: {
+      manual:
+        '"{{before}}" could be written as "{{after}}", which generates the same CSS - but {{names}} {{verb}} marked manual. Rewrite it by hand if the name fits this element.',
+      apply: 'Rewrite as "{{after}}"',
+    },
+  },
+
+  create(context) {
+    const options = { ...MANUAL_DEFAULTS, ...(context.options[0] ?? {}) } as Required<ManualShortcutsOptions>
+    const configPath = resolveConfigPath(context, options.configPath)
+
+    const planOptions: PlanOptions = {
+      shortcuts: true,
+      allowScoped: options.allowScoped,
+      blocklist: false,
+      rootFontSize: options.rootFontSize,
+      variantGroups: false,
+      suggestManual: true,
+    }
+
+    return classAttributes(context, (node, before) => {
+      const plan = syncPlan(configPath, before, context.filename, planOptions)
+      if (!plan.changed) return
+
+      // The shortcut names the rewrite would introduce - what the reviewer is
+      // being asked about.
+      const written = new Set(before.split(/\s+/))
+      const names = plan.value.split(/\s+/).filter((token) => token && !written.has(token))
+
+      context.report({
+        node,
+        messageId: 'manual',
+        data: {
+          before,
+          after: plan.value,
+          names: names.map((name) => `"${name}"`).join(', '),
+          verb: names.length === 1 ? 'is' : 'are',
+        },
+        suggest: [{
+          messageId: 'apply',
+          data: { after: plan.value },
+          fix: (fixer) => replaceValue(fixer, context, node, plan.value),
+        }],
+      })
+    })
+  },
+}

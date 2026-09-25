@@ -116,6 +116,22 @@ export interface ScopedShortcutMeta extends RuleMeta {
    * `allowScoped` option.
    */
   scoped?: boolean
+  /**
+   * Suggest this shortcut; never write it.
+   *
+   * For names that carry meaning beyond their utilities. `vf-button-xs` is
+   * `p-2 text-sm lh-1` today, but it also says "this is a small button" - and
+   * collapsing a badge's `p-2 text-sm lh-1` into it would be provably
+   * equivalent and still wrong. It would also tie the badge to whatever the
+   * button becomes next.
+   *
+   * `unocss-normalize/classes` leaves a manual shortcut alone.
+   * `unocss-normalize/manual-shortcuts` reports the collapse instead, with the
+   * rewrite as an editor suggestion rather than a fix - wherever the collapse
+   * would otherwise have been allowed, so a scoped manual shortcut is still
+   * never proposed outside `allowScoped`.
+   */
+  manual?: boolean
 }
 
 /**
@@ -148,20 +164,35 @@ export interface ScopedShortcutMeta extends RuleMeta {
  * a marker that is supposed to be inert. `'shortcuts'` is UnoCSS's own default;
  * pass the value of `shortcutsLayer` if the config sets one.
  *
+ * Pass `manual: true` for names that should only ever be suggested - see
+ * {@link ScopedShortcutMeta.manual}:
+ *
+ * ```ts
+ * export default [
+ *   ...scoped(button, { manual: true }),
+ *   ...scoped(typography),
+ * ] as UserShortcuts
+ * ```
+ *
  * @param map - Static shortcuts, as a layer authors them.
- * @param options - `layer`, when the config sets a custom `shortcutsLayer`.
+ * @param options - Overrides.
+ * @param options.layer - The CSS layer to keep them in, when the config sets a
+ *   custom `shortcutsLayer`.
+ * @param options.manual - Suggest these shortcuts; never write them.
  * @returns The same shortcuts as tuples, each carrying `{ scoped: true }`.
  */
 export function scoped(
   map: StaticShortcutMap,
-  options: { layer?: string } = {},
+  options: { layer?: string, manual?: boolean } = {},
 ): StaticShortcut[] {
   // UnoCSS's `LAYER_SHORTCUTS`, inlined: this module is imported by a
   // `uno.config.ts`, which the build loads too, and it stays import-free.
   const layer = options.layer ?? 'shortcuts'
 
   return Object.entries(map).map(([name, value]): StaticShortcut => {
-    const meta: ScopedShortcutMeta = { layer, scoped: true }
+    const meta: ScopedShortcutMeta = options.manual
+      ? { layer, scoped: true, manual: true }
+      : { layer, scoped: true }
 
     return [name, value, meta]
   })

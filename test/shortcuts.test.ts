@@ -46,6 +46,22 @@ describe('collapsibleShortcuts', () => {
     ])
   })
 
+  it('reads the manual marker the same way, independently of scoped', () => {
+    const sets = collapsibleShortcuts([
+      ['center', 'items-center justify-center'],
+      ['focus-ring', 'ring-2 ring-offset-2', { manual: true }],
+      ['vf-button-xs', 'p-2 text-sm lh-1', { scoped: true, manual: true }],
+      ['odd', 'x y', { manual: 'yes' }],
+    ])
+
+    expect(sets.map((set) => [set.name, set.scoped, set.manual])).toEqual([
+      ['vf-button-xs', true, true],
+      ['center', false, false],
+      ['focus-ring', false, true],
+      ['odd', false, false],
+    ])
+  })
+
   it('treats a missing, false, or non-boolean marker as not scoped', () => {
     const sets = collapsibleShortcuts([
       ['a', 'x y'],

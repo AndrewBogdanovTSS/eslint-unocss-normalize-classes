@@ -70,6 +70,13 @@ export function buildThemedConfigs(plugin: ESLint.Plugin, options: ThemedConfigs
       plugins: { 'unocss-normalize': plugin },
       rules: {
         'unocss-normalize/classes': [severity, { ...ruleOptions, configPath, allowScoped: true }],
+        // What `classes` declines because the config marked the shortcut
+        // `manual`, asked as a question. Silent until something is marked.
+        'unocss-normalize/manual-shortcuts': ['warn', {
+          configPath,
+          allowScoped: true,
+          ...(ruleOptions.rootFontSize === undefined ? {} : { rootFontSize: ruleOptions.rootFontSize }),
+        }],
       },
     }]
   })

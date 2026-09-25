@@ -73,6 +73,21 @@ export default defineConfig({
     ...scoped({
       'brand-title': 'fw-bold tracking-wide',
     }),
+
+    // Manual: suggested, never written. A name that says more than its
+    // utilities do, so a matching class list is a question for a human.
+    // One unscoped - suggested anywhere - and one scoped, which is only ever
+    // suggested where the file's layer is known.
+    //
+    // A hand-written meta restates `layer`: any meta at all replaces the
+    // default that puts a shortcut in the shortcuts layer. And the name is
+    // `halo`, not `focus-ring` - presetWind3 has its own `focus-ring` (a 3px
+    // ring on :focus), which wins the name, and the prover rightly refused to
+    // collapse into it.
+    ['halo', 'ring-2 ring-offset-2', { layer: 'shortcuts', manual: true }],
+    ...scoped({
+      'brand-button': 'shadow-md tracking-tight',
+    }, { manual: true }),
   ],
 
   blocklist: hideFixes([

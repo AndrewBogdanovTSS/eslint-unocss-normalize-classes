@@ -41,13 +41,24 @@ describe('themedConfigs', () => {
 
   it('points each block at its theme\'s config and turns allowScoped on', () => {
     const [dark] = themedConfigs({ themes, rootDir })
+    const configPath = resolve(rootDir, '.nuxt', 'uno/config/dark.mjs')
 
     expect(dark.rules).toEqual({
-      'unocss-normalize/classes': ['error', {
-        configPath: resolve(rootDir, '.nuxt', 'uno/config/dark.mjs'),
-        allowScoped: true,
-      }],
+      'unocss-normalize/classes': ['error', { configPath, allowScoped: true }],
+      // Manual shortcuts are asked about exactly where they would otherwise
+      // have been written - and nowhere else.
+      'unocss-normalize/manual-shortcuts': ['warn', { configPath, allowScoped: true }],
     })
+  })
+
+  it('hands rootFontSize to the manual rule too, so its proofs agree', () => {
+    const [dark] = themedConfigs({ themes, rootDir, ruleOptions: { rootFontSize: 10, variantGroups: true } })
+
+    expect(dark.rules?.['unocss-normalize/manual-shortcuts']).toEqual(['warn', {
+      configPath: resolve(rootDir, '.nuxt', 'uno/config/dark.mjs'),
+      allowScoped: true,
+      rootFontSize: 10,
+    }])
   })
 
   it('registers the plugin itself, as the same object the package exports', () => {

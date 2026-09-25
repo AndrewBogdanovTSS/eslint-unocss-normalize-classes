@@ -28,6 +28,12 @@ export interface ShortcutSet {
    * @see `ScopedShortcutMeta` in `../config`, and the `scoped` helper beside it.
    */
   scoped?: boolean
+  /**
+   * The config marked this shortcut `manual`: suggest it, never write it.
+   *
+   * @see `ScopedShortcutMeta.manual` in `../config`.
+   */
+  manual?: boolean
 }
 
 /**
@@ -50,14 +56,14 @@ export function collapsibleShortcuts(shortcuts: readonly unknown[]): ShortcutSet
 
   for (const shortcut of shortcuts) {
     if (!Array.isArray(shortcut)) continue
-    const [name, value, meta] = shortcut as [unknown, unknown, { scoped?: unknown } | undefined]
+    const [name, value, meta] = shortcut as [unknown, unknown, { scoped?: unknown, manual?: unknown } | undefined]
     if (typeof name !== 'string' || typeof value !== 'string') continue
 
     // A shortcut may itself be written with variant groups
     // (`active:(bg-grey-90 c-grey-10)`); expanded, its tokens line up with the
     // tokens a template actually carries.
     const tokens = parseVariantGroup(value).expanded.trim().split(/\s+/).filter(Boolean)
-    if (tokens.length > 1) sets.push({ name, tokens, scoped: meta?.scoped === true })
+    if (tokens.length > 1) sets.push({ name, tokens, scoped: meta?.scoped === true, manual: meta?.manual === true })
   }
 
   return sets.sort((a, b) => b.tokens.length - a.tokens.length)

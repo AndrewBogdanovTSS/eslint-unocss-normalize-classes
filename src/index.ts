@@ -14,7 +14,7 @@
  * this package as a dependency.
  */
 import type { ESLint, Linter } from 'eslint'
-import classes from './rule'
+import classes, { manualShortcuts } from './rule'
 import type { ThemedConfigsOptions } from './themes'
 import { buildThemedConfigs } from './themes'
 
@@ -28,11 +28,11 @@ export { applyShortcut, collapsibleShortcuts, matchShortcut } from './core/short
 export type { ShortcutMatch, ShortcutSet } from './core/shortcuts'
 export { joinToken, lastVariantSeparator, splitClassValue, splitToken } from './core/tokens'
 export type { SplitToken } from './core/tokens'
-export type { RuleOptions } from './rule'
+export type { ManualShortcutsOptions, RuleOptions } from './rule'
 export type { PlanOptions, PlanRequest } from './session'
 export { planForConfig } from './session'
 export type { ThemedConfigsOptions } from './themes'
-export { classes }
+export { classes, manualShortcuts }
 
 const plugin = {
   meta: {
@@ -40,7 +40,7 @@ const plugin = {
     // Substituted at build time from package.json - see tsdown.config.ts.
     version: typeof __PLUGIN_VERSION__ === 'string' ? __PLUGIN_VERSION__ : '0.0.0-dev',
   },
-  rules: { classes },
+  rules: { classes, 'manual-shortcuts': manualShortcuts },
   configs: {} as Record<string, unknown>,
 }
 
@@ -52,7 +52,12 @@ const plugin = {
 plugin.configs.recommended = [{
   files: ['**/*.vue'],
   plugins: { 'unocss-normalize': plugin },
-  rules: { 'unocss-normalize/classes': 'error' },
+  rules: {
+    'unocss-normalize/classes': 'error',
+    // A question for a reviewer, not a proved rewrite - and silent until the
+    // config marks a shortcut `manual`.
+    'unocss-normalize/manual-shortcuts': 'warn',
+  },
 }]
 
 /**

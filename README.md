@@ -58,6 +58,11 @@ root. Point somewhere else with the rule's `configPath` option, or with
 `settings: { unocss: { configPath } }`, which is the same setting
 `@unocss/eslint-plugin` reads.
 
+The plugin has a second rule, `unocss-normalize/manual-shortcuts`, which stays
+silent until the config marks a shortcut `manual` - see
+[Shortcuts to suggest rather than apply](#shortcuts-to-suggest-rather-than-apply).
+`recommended` turns both on.
+
 ## Where the rewrites come from
 
 Two sources, both already in your config. Neither one reads a message: prose
@@ -386,6 +391,50 @@ cache is keyed by config alone, and `allowScoped` is applied per plan.
 A scoped shortcut that is skipped is skipped silently - like `shortcuts: false`,
 and unlike a refused rewrite. There is nothing to fix in the config, so there
 is nothing to report.
+
+### Shortcuts to suggest rather than apply
+
+Some shortcut names say more than their utilities do. `vf-button-xs` is
+`p-2 text-sm lh-1` today, but it also says "this is a small button". Collapse a
+badge's `p-2 text-sm lh-1` into it and the CSS is provably the same - and the
+badge is now a button by name, and will change whenever the button does.
+
+Mark such shortcuts `manual`:
+
+```ts
+export default [
+  ...scoped(button, { manual: true }),   // suggested, never written
+  ...scoped(typography),
+] as UserShortcuts
+```
+
+`unocss-normalize/classes` never collapses into a manual shortcut.
+`unocss-normalize/manual-shortcuts` reports the collapse instead - with the
+rewrite as an editor suggestion rather than a fix, so `--fix` leaves it alone
+and a person decides:
+
+```
+"p-2 text-sm lh-1 c-grey-20" could be written as "vf-button-xs c-grey-20",
+which generates the same CSS - but "vf-button-xs" is marked manual. Rewrite it
+by hand if the name fits this element.
+```
+
+- **Where it asks:** exactly where the collapse would otherwise have been
+  written. A scoped manual shortcut is only suggested under `allowScoped`; in
+  shared code the collapse would be wrong, so nothing is asked.
+- **Its own rule, its own severity:** ESLint gives a rule one severity for
+  everything it reports, and a question for a reviewer is not the same kind of
+  finding as a proved rewrite. `recommended` and `themedConfigs()` set it to
+  `warn`.
+- **Options:** `configPath`, `allowScoped` and `rootFontSize`, meaning what
+  they mean for `classes`. A collapse is proved before it is suggested, the
+  same way one is proved before it is written.
+- **An unscoped shortcut** can be marked by hand. Restate the layer: any meta
+  at all replaces the default that keeps a shortcut in the shortcuts layer.
+
+  ```ts
+  ['halo', 'ring-2 ring-offset-2', { layer: 'shortcuts', manual: true }]
+  ```
 
 ## Options
 

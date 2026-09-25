@@ -34,6 +34,16 @@ export interface PlanOptions {
    * this on gets a rewrite that renders differently in every other build.
    */
   allowScoped: boolean
+  /**
+   * Plan with the shortcuts the config marked `manual`, and nothing else.
+   *
+   * Off, which is how `unocss-normalize/classes` plans, a manual shortcut is
+   * never a collapse source. On, which is how
+   * `unocss-normalize/manual-shortcuts` plans, only manual shortcuts are - and
+   * the blocklist and variant grouping stand aside, so the one change left to
+   * report is the collapse a human is being asked to decide on.
+   */
+  suggestManual?: boolean
   /** Apply the `fix` a blocklist entry declares. */
   blocklist: boolean
   /** Root font size for comparing `rem` against `px`, or `false` to compare strictly. */
@@ -197,20 +207,24 @@ async function plan(
   // keyed by config alone: one project can lint its shared code and its
   // layer-scoped code in the same run, against the same config, with different
   // answers to this question.
-  const usable = options.allowScoped
+  const inScope = options.allowScoped
     ? session.shortcuts
     : session.shortcuts.filter((shortcut) => !shortcut.scoped)
+  // A manual shortcut is suggested where it would otherwise have been usable,
+  // and applied nowhere - so this splits the usable set, it does not widen it.
+  const suggesting = options.suggestManual === true
+  const usable = inScope.filter((shortcut) => (shortcut.manual === true) === suggesting)
 
   return planRewrite(value, {
     shortcuts: options.shortcuts ? usable : [],
-    variantGroups: options.variantGroups,
+    variantGroups: suggesting ? false : options.variantGroups,
     sortKey: async (token) => {
       const key = cacheKey(scope, 'sort', token)
       if (!sortKeys.has(key)) sortKeys.set(key, await sortKey(session, token))
       return sortKeys.get(key) ?? null
     },
     declaredFix: async (token) => {
-      if (!options.blocklist) return null
+      if (!options.blocklist || suggesting) return null
       const key = cacheKey(scope, token)
       if (!fixes.has(key)) fixes.set(key, declaredFix(session, token))
       return fixes.get(key) ?? null

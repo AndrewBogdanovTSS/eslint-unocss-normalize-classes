@@ -120,7 +120,8 @@ check('the plugin reports the version package.json declares', () => {
 
 check('the recommended config names the rule it ships', () => {
   const [entry] = plugin.configs.recommended
-  assert.deepEqual(Object.keys(entry.rules), ['unocss-normalize/classes'])
+  assert.deepEqual(Object.keys(entry.rules), ['unocss-normalize/classes', 'unocss-normalize/manual-shortcuts'])
+  assert.equal(entry.rules['unocss-normalize/manual-shortcuts'], 'warn', 'a question for a reviewer is a warning')
   assert.deepEqual(entry.files, ['**/*.vue'])
 })
 
@@ -178,6 +179,30 @@ check('fixing is idempotent - a second pass over the output changes nothing', as
   const once = await lint(readFileSync(join(fixture, 'example.vue'), 'utf8'))
   const twice = await lint(once.output)
   assert.equal(twice.output, undefined, 'the rule kept rewriting its own output')
+})
+
+check('a manual shortcut is suggested, never written - even with --fix', async () => {
+  const eslint = new ESLint({
+    cwd: root,
+    overrideConfigFile: true,
+    overrideConfig: [{
+      files: ['**/*.vue'],
+      languageOptions: { parser: vueParser, ecmaVersion: 2022, sourceType: 'module' },
+      plugins: { 'unocss-normalize': plugin },
+      rules: {
+        'unocss-normalize/classes': ['error', { configPath }],
+        'unocss-normalize/manual-shortcuts': ['warn', { configPath }],
+      },
+    }],
+    fix: true,
+  })
+  const [result] = await eslint.lintText('<template><div class="ring-2 ring-offset-2" /></template>', { filePath: join(fixture, 'smoke.vue') })
+
+  assert.equal(result.output, undefined, 'a manual shortcut was written by --fix')
+  assert.equal(result.messages.length, 1)
+  assert.equal(result.messages[0].ruleId, 'unocss-normalize/manual-shortcuts')
+  assert.equal(result.messages[0].severity, 1)
+  assert.equal(result.messages[0].suggestions?.[0]?.fix.text, 'halo')
 })
 
 check('a config that never declared a fix still collapses shortcuts', async () => {
