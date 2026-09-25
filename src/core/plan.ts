@@ -64,6 +64,17 @@ export interface PlanDeps {
    */
   variantGroups?: false | { minimum: number }
   /**
+   * Hold, rather than write, a proved match for a shortcut marked `manual`.
+   *
+   * The match still takes part - largest first, like any other - and its
+   * tokens are then reserved, so no smaller shortcut can take them either.
+   * Marking a shortcut manual should change whether the collapse is written,
+   * not which tokens belong together: left out of matching instead, a manual
+   * shortcut would let a smaller one take part of its tokens, and once that
+   * was written the question the marker exists to ask could never be asked.
+   */
+  holdManual?: boolean
+  /**
    * How many times a token may be rewritten in a row. A blocklist can chain -
    * `ma-auto` to `m-auto` to `m-a` - and two entries can also disagree in a
    * loop. This bounds both without having to tell them apart.
@@ -136,6 +147,8 @@ async function collapseShortcuts(
 ): Promise<string[]> {
   const maxPasses = deps.maxPasses ?? DEFAULT_MAX_PASSES
   let current = tokens
+  // Tokens a held manual match has reserved, index for index with `current`.
+  let held = tokens.map(() => false)
 
   // Repeated until nothing moves, because shortcuts are routinely defined in
   // terms of each other: `card` is `f-col gap-4 p-6`, and `f-col` only appears
@@ -148,11 +161,24 @@ async function collapseShortcuts(
     for (const shortcut of deps.shortcuts) {
       if (current.includes(shortcut.name)) continue
 
-      const match = matchShortcut(current, shortcut)
+      // A reserved token is blanked rather than removed, so the indexes the
+      // match reports still point into `current`. No shortcut token is empty.
+      const match = matchShortcut(current.map((token, index) => (held[index] ? '' : token)), shortcut)
       if (!match) continue
 
       const matched = match.indexes.map((index) => current[index]).join(' ')
       if (await deps.prove(matched, shortcut.name)) {
+        if (shortcut.manual && deps.holdManual) {
+          // Reserved, not written: no change to the list, so no further pass
+          // is owed - holding can only take matches away.
+          for (const index of match.indexes) held[index] = true
+          continue
+        }
+        // `applyShortcut` removes the matched tokens and puts the name where
+        // the first of them was; `held` has to move the same way.
+        const claimed = new Set(match.indexes)
+        held = held.filter((_reserved, index) => !claimed.has(index))
+        held.splice(Math.min(...match.indexes), 0, false)
         current = applyShortcut(current, match)
         changed = true
       } else {

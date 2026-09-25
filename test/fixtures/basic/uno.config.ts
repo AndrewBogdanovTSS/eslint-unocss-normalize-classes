@@ -85,6 +85,12 @@ export default defineConfig({
     // ring on :focus), which wins the name, and the prover rightly refused to
     // collapse into it.
     ['halo', 'ring-2 ring-offset-2', { layer: 'shortcuts', manual: true }],
+
+    // A manual shortcut with an ordinary one inside it. `chip` wins the match -
+    // it is the larger - so its tokens are held for a human, and `slant` must
+    // not take `mr-3 italic` out from under the question.
+    ['chip', 'ml-3 mr-3 italic', { layer: 'shortcuts', manual: true }],
+    { slant: 'mr-3 italic' },
     ...scoped({
       'brand-button': 'shadow-md tracking-tight',
     }, { manual: true }),

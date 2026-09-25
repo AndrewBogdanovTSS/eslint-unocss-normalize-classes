@@ -388,3 +388,31 @@ describe('manual shortcuts', () => {
     expect(result.unproven).toEqual([])
   })
 })
+
+/*
+* A manual match holds its tokens.
+*
+* Left out of matching instead, a manual shortcut would let a smaller ordinary
+* one take part of its tokens - and once `--fix` wrote that, the question the
+* marker exists to ask could never be asked. `chip` (manual) is
+* `ml-3 mr-3 italic`; `slant` (ordinary) is `mr-3 italic`.
+*/
+describe('a held manual match', () => {
+  it('keeps a smaller ordinary shortcut off its tokens', async () => {
+    const result = await plan('ml-3 mr-3 italic')
+    expect(result.changed).toBe(false)
+  })
+
+  it('is still suggested, the tokens being exactly where they were', async () => {
+    expect((await plan('ml-3 mr-3 italic', { suggestManual: true })).value).toBe('chip')
+  })
+
+  it('reserves only its own tokens', async () => {
+    // `center` is ordinary and shares nothing with `chip`, so it is written.
+    expect((await plan('ml-3 items-center mr-3 justify-center italic')).value).toBe('ml-3 center mr-3 italic')
+  })
+
+  it('does not stop the smaller shortcut where the larger one does not match', async () => {
+    expect((await plan('mr-3 italic')).value).toBe('slant')
+  })
+})

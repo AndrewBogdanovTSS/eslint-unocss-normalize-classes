@@ -37,8 +37,9 @@ export interface PlanOptions {
   /**
    * Plan with the shortcuts the config marked `manual`, and nothing else.
    *
-   * Off, which is how `unocss-normalize/classes` plans, a manual shortcut is
-   * never a collapse source. On, which is how
+   * Off, which is how `unocss-normalize/classes` plans, a manual shortcut's
+   * match is held - its tokens kept as written, and out of reach of any smaller
+   * shortcut - but never written. On, which is how
    * `unocss-normalize/manual-shortcuts` plans, only manual shortcuts are - and
    * the blocklist and variant grouping stand aside, so the one change left to
    * report is the collapse a human is being asked to decide on.
@@ -210,13 +211,17 @@ async function plan(
   const inScope = options.allowScoped
     ? session.shortcuts
     : session.shortcuts.filter((shortcut) => !shortcut.scoped)
-  // A manual shortcut is suggested where it would otherwise have been usable,
-  // and applied nowhere - so this splits the usable set, it does not widen it.
+  // Planning for `classes`, a manual shortcut still takes part in matching,
+  // and a match for it is held rather than written - so a smaller shortcut
+  // cannot take its tokens. Suggesting, manual shortcuts are the only collapse
+  // sources, and are written into the suggestion. Either way a manual shortcut
+  // is only ever used where it is in scope.
   const suggesting = options.suggestManual === true
-  const usable = inScope.filter((shortcut) => (shortcut.manual === true) === suggesting)
+  const usable = suggesting ? inScope.filter((shortcut) => shortcut.manual === true) : inScope
 
   return planRewrite(value, {
     shortcuts: options.shortcuts ? usable : [],
+    holdManual: !suggesting,
     variantGroups: suggesting ? false : options.variantGroups,
     sortKey: async (token) => {
       const key = cacheKey(scope, 'sort', token)

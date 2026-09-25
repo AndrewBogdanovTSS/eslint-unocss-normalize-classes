@@ -20,7 +20,7 @@ import type { Linter } from 'eslint'
 import * as vueParser from 'vue-eslint-parser'
 import { describe, expect, it } from 'vitest'
 import { isEquivalent } from '../src/core/equivalence'
-import rule from '../src/rule'
+import rule, { manualShortcuts } from '../src/rule'
 import { assertWorkerIsCurrent } from './helpers/worker-is-current'
 
 assertWorkerIsCurrent()
@@ -324,3 +324,40 @@ describe('the attribute still renders the same after both rules', () => {
     expect(isEquivalent(await generate(classes), await generate(classesOf(output)))).toBe(true)
   })
 })
+
+/*
+* The flow a pre-commit hook runs: both rules, `--fix`, then whatever is left.
+*
+* A manual match holds its tokens, so `--fix` cannot write a smaller ordinary
+* shortcut over them - and the question is still there after fixing. Before the
+* hold, `slant` took `mr-3 italic` on the fix pass, and the `chip` warning was
+* gone before anyone saw it.
+*/
+describe('a manual question survives --fix', () => {
+  it('leaves the tokens for a person, and still asks', async () => {
+    const eslint = new ESLint({
+      cwd: root,
+      overrideConfigFile: true,
+      overrideConfig: [{
+        files: ['**/*.vue'],
+        languageOptions: { parser: vueParser, ecmaVersion: 2022, sourceType: 'module' },
+        plugins: { 'unocss-normalize': { rules: { 'classes': rule, 'manual-shortcuts': manualShortcuts } } },
+        rules: {
+          'unocss-normalize/classes': ['error', { configPath }],
+          'unocss-normalize/manual-shortcuts': ['warn', { configPath }],
+        },
+      }],
+      fix: true,
+    })
+
+    const code = '<template><div class="ml-3 mr-3 italic" /></template>'
+    const [result] = await eslint.lintText(code, { filePath: join(root, 'test', 'fixtures', 'basic', 'interop.vue') })
+
+    expect(result.output).toBeUndefined()
+    expect(result.messages.map((message) => [message.ruleId, message.severity])).toEqual([
+      ['unocss-normalize/manual-shortcuts', 1],
+    ])
+    expect(result.messages[0].suggestions?.[0]?.fix.text).toBe('chip')
+  })
+})
+

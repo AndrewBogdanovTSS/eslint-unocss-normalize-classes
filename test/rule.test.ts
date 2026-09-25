@@ -148,6 +148,11 @@ ruleTester.run('unocss-normalize/classes', rule, {
       options,
     },
     {
+      name: 'a manual match, whose tokens a smaller shortcut may not take',
+      code: '<template><div class="ml-3 mr-3 italic" /></template>',
+      options,
+    },
+    {
       name: 'a scoped manual shortcut, even where scoped ones are allowed',
       code: '<template><div class="shadow-md tracking-tight" /></template>',
       options: [{ configPath, allowScoped: true }],

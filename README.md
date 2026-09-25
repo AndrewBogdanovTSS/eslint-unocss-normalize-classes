@@ -422,6 +422,10 @@ by hand if the name fits this element.
 - **Where it asks:** exactly where the collapse would otherwise have been
   written. A scoped manual shortcut is only suggested under `allowScoped`; in
   shared code the collapse would be wrong, so nothing is asked.
+- **It holds its tokens:** a manual shortcut still takes part in matching,
+  largest first, and a match for it reserves its tokens. No smaller shortcut
+  can take them, so `--fix` - a pre-commit hook, say - cannot answer the
+  question before anyone has seen it.
 - **Its own rule, its own severity:** ESLint gives a rule one severity for
   everything it reports, and a question for a reviewer is not the same kind of
   finding as a proved rewrite. `recommended` and `themedConfigs()` set it to
